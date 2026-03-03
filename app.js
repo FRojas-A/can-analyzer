@@ -1,10 +1,10 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const http = require("node:http");
-const readline = require("node:readline");
+import fs from "node:fs";
+import path from "node:path";
+import http from "node:http";
+import readline from "node:readline";
 
-const { SerialPort } = require("serialport");
-const { WebSocketServer } = require("ws");
+import { SerialPort } from "serialport";
+import { WebSocketServer } from "ws";
 
 const WS_PORT = Number(process.env.WS_PORT || 8080);
 const SERIAL_BAUD = Number(process.env.SERIAL_BAUD || 115200);
@@ -42,6 +42,11 @@ const serverStats = {
   ingestParseErrors: 0,
   serialErrors: 0,
   broadcastDroppedFrames: 0,
+  serialLinesReceived: 0,
+  serialStatsMessages: 0,
+  lastFrameAt: null,
+  lastFrameId: null,
+  lastFrameData: null,
 };
 
 const recording = {
@@ -117,6 +122,67 @@ function buildDiff(prevHex, nextHex) {
     changed: changedBytes.length > 0,
     changedBytes,
     changedBits,
+  };
+}
+
+function buildHealthPayload() {
+  const now = Date.now();
+  const uptimeMs = now - serverStats.startedAt;
+  const avgFramesPerSec = uptimeMs > 0
+    ? Number(((serverStats.ingestFrames * 1000) / uptimeMs).toFixed(2))
+    : 0;
+  const sinceLastFrameMs = serverStats.lastFrameAt ? now - serverStats.lastFrameAt : null;
+  const errorCount =
+    serverStats.ingestParseErrors
+    + serverStats.serialErrors
+    + serverStats.broadcastDroppedFrames
+    + Number(deviceStats.errors || 0);
+
+  return {
+    ok: true,
+    now,
+    uptimeMs,
+    errorCount,
+    errors: {
+      ingestParseErrors: serverStats.ingestParseErrors,
+      serialErrors: serverStats.serialErrors,
+      broadcastDroppedFrames: serverStats.broadcastDroppedFrames,
+      deviceErrors: Number(deviceStats.errors || 0),
+    },
+    serial: {
+      open: serialOpen,
+      path: serialPath,
+      baud: SERIAL_BAUD,
+      linesReceived: serverStats.serialLinesReceived,
+      statsMessages: serverStats.serialStatsMessages,
+      errors: serverStats.serialErrors,
+    },
+    websocket: {
+      clients: clients.size,
+      droppedFrames: serverStats.broadcastDroppedFrames,
+    },
+    ingest: {
+      frames: serverStats.ingestFrames,
+      parseErrors: serverStats.ingestParseErrors,
+      avgFramesPerSec,
+      idsTracked: latestById.size,
+      hotBufferFrames: hotBuffer.length,
+      lastFrameAt: serverStats.lastFrameAt,
+      sinceLastFrameMs,
+      lastFrameId: serverStats.lastFrameId,
+      lastFrameData: serverStats.lastFrameData,
+    },
+    device: {
+      ...deviceStats,
+      sinceLastDeviceStatsMs: deviceStats.ts ? now - deviceStats.ts : null,
+    },
+    recording: {
+      active: recording.active,
+      id: recording.id,
+      startedAt: recording.startedAt,
+      bytesWritten: recording.bytesWritten,
+      frameCount: recording.frameCount,
+    },
   };
 }
 
@@ -262,6 +328,8 @@ function handleSerialLine(line) {
     return;
   }
 
+  serverStats.serialLinesReceived += 1;
+
   let message;
   try {
     message = JSON.parse(line);
@@ -271,6 +339,7 @@ function handleSerialLine(line) {
   }
 
   if (message.type === "stats") {
+    serverStats.serialStatsMessages += 1;
     deviceStats.received = Number(message.received) || 0;
     deviceStats.skipped = Number(message.skipped) || 0;
     deviceStats.errors = Number(message.errors) || 0;
@@ -288,6 +357,9 @@ function handleSerialLine(line) {
   }
 
   serverStats.ingestFrames += 1;
+  serverStats.lastFrameAt = frame.ts;
+  serverStats.lastFrameId = frame.id;
+  serverStats.lastFrameData = frame.data;
   seq += 1;
 
   const prev = latestById.get(frame.id);
@@ -492,19 +564,7 @@ function handleWsControl(ws, data) {
 
 const server = http.createServer((req, res) => {
   if (req.url === "/health") {
-    const body = {
-      ok: true,
-      serialOpen,
-      serialPath,
-      wsClients: clients.size,
-      idsTracked: latestById.size,
-      ingestFrames: serverStats.ingestFrames,
-      parseErrors: serverStats.ingestParseErrors,
-      recording: {
-        active: recording.active,
-        id: recording.id,
-      },
-    };
+    const body = buildHealthPayload();
 
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
@@ -564,6 +624,7 @@ wss.on("connection", (ws) => {
 server.listen(WS_PORT, async () => {
   console.log(`[ws] listening on :${WS_PORT}`);
   console.log("[ws] controls: startRecording, stopRecording, listRecordings, replayRecording");
+
   try {
     await openSerial();
   } catch (err) {
