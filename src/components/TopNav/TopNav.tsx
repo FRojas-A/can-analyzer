@@ -1,8 +1,9 @@
 import { Activity, Circle, Eye, Radio } from "lucide-react";
 import Button from "../ui/button";
+import type { ConnectionStatus } from "@/types/types";
 
 interface TopNavProps {
-    connectionStatus: "connecting" | "LIVE" | "offline" | "error"
+    connectionStatus: ConnectionStatus
     hiddenCount: number
     showHidden: boolean
     onToggleShowHidden: () => void
@@ -19,7 +20,7 @@ export default function TopNav({
             <div className="flex gap-4">
                 <div className="flex gap-2">
                     <Activity className="text-primary" size={20} />
-                    <h1 className="text-sm font-semibold tracking-tight">CAN Bus Analyzer</h1>
+                    <h1 className="font-semibold tracking-tight">CAN Bus Analyzer</h1>
                 </div>
                 <div className="flex items-center gap-1.5 ml-4">
                     <div className="w-2 h-2 rounded-full bg-success animate-pulse-dot" />

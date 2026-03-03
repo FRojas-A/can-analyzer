@@ -61,4 +61,4 @@ export type PendingFrameUpdate = {
   hits: number
 }
 
-export type ConnectionStatus = "connecting" | "LIVE" | "offline" | "error"
+export type ConnectionStatus = "CONNECTING" | "LIVE" | "OFFLINE" | "ERROR" | "TESTING"

@@ -90,7 +90,7 @@ const resolveTestMode = (value: unknown) => TEST_MODE_FLAGS.has(String(value ?? 
 
 export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   const [messages, setMessages] = useState<Map<string, CANMessage>>(new Map())
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting")
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("CONNECTING")
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const pendingFramesRef = useRef<Map<string, PendingFrameUpdate>>(new Map())
 
@@ -134,7 +134,7 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   useEffect(() => {
     if (useTestData) {
       setMessages(createSeededMessages())
-      setConnectionStatus("offline")
+      setConnectionStatus("TESTING")
       setConnectionError(null)
       return
     }
@@ -142,7 +142,7 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     const ws = new WebSocket(wsUrl)
     const flushTimer = window.setInterval(flushPendingFrames, frameFlushIntervalMs)
 
-    setConnectionStatus("connecting")
+    setConnectionStatus("CONNECTING")
     setConnectionError(null)
 
     ws.onopen = () => {
@@ -151,12 +151,12 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     }
 
     ws.onerror = () => {
-      setConnectionStatus("error")
+      setConnectionStatus("ERROR")
       setConnectionError("Unable to reach websocket server")
     }
 
     ws.onclose = () => {
-      setConnectionStatus("offline")
+      setConnectionStatus("OFFLINE")
     }
 
     ws.onmessage = (messageEvent) => {

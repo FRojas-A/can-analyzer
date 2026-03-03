@@ -2,6 +2,8 @@
 
 A real-time CAN bus analysis tool for monitoring, recording, and analyzing Controller Area Network (CAN) messages. This application provides a web-based interface for visualizing CAN traffic with live updates, frame filtering, and signal extraction capabilities.
 
+![Dashboard screenshot](image.png)
+
 ## Architecture
 
 The system consists of three main components:
