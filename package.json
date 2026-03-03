@@ -1,5 +1,5 @@
 {
-  "name": "can-decoder",
+  "name": "can-analyzer",
   "private": true,
   "version": "0.0.0",
   "type": "module",

@@ -403,8 +403,32 @@ async function resolveSerialPath() {
     return ports[0].path;
   }
 
-  const choices = ports.map((p) => p.path).join(", ");
-  throw new Error(`Multiple serial ports found (${choices}). Set SERIAL_PATH explicitly.`);
+  // Interactive selection for multiple ports
+  console.log('\nMultiple serial ports found:');
+  ports.forEach((port, i) => {
+    const manufacturer = port.manufacturer || 'Unknown manufacturer';
+    const productId = port.productId || '';
+    const vendorId = port.vendorId || '';
+    console.log(`${i + 1}. ${port.path} (${manufacturer}${productId ? `, PID: ${productId}` : ''}${vendorId ? `, VID: ${vendorId}` : ''})`);
+  });
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise((resolve, reject) => {
+    rl.question('\nSelect port number (1-' + ports.length + '): ', (answer) => {
+      const index = parseInt(answer) - 1;
+      if (index >= 0 && index < ports.length) {
+        rl.close();
+        resolve(ports[index].path);
+      } else {
+        rl.close();
+        reject(new Error(`Invalid selection. Please enter a number between 1 and ${ports.length}.`));
+      }
+    });
+  });
 }
 
 async function openSerial() {
