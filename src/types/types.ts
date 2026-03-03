@@ -5,7 +5,7 @@ export interface CANMessage {
   prevData?: number[]; // previous data for diff
   dlc: number;
   count: number;
-  rate: number; // msgs/sec
+  rate: number; // Hz (messages per second)
 }
 
 export type Endianness = 'big' | 'little';
@@ -14,6 +14,7 @@ export interface SignalConfig {
   name: string;
   startBit: number;
   bitLength: number;
+  color?: string;
   endianness: Endianness;
   scale: number;
   offset: number;
