@@ -1,21 +1,19 @@
+import { toNumber } from "@/lib/utils"
 import { evaluateTransform, extractSignalValue } from "@/lib/can-utils"
 import type { Endianness, SignalConfig } from "@/types/types"
 import { X } from "lucide-react"
 import Button from "../ui/button"
 
 interface SignalsProps {
+    frameColor: string
     data: number[]
     signals: SignalConfig[]
     onUpdateSignal: (signalIndex: number, nextSignal: SignalConfig) => void
     onRemoveSignal: (signalIndex: number) => void
 }
 
-const toNumber = (value: string, fallback: number) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : fallback
-}
 
-const Signals = ({ data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
     if (signals.length === 0) {
         return <div className="w-full rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No signals yet. Select bits and click Add Signal.</div>
     }
@@ -40,6 +38,11 @@ const Signals = ({ data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps
                 return (
                     <div key={`${signal.name}-${index}`} className="w-full rounded-lg border border-border bg-card/50 p-3 space-y-2">
                         <div className="flex items-center gap-2">
+                            <span
+                                className="h-2.5 w-2.5 rounded-full border border-border"
+                                style={{ backgroundColor: frameColor }}
+                                aria-hidden
+                            />
                             <input
                                 type="text"
                                 value={signal.name}
@@ -47,7 +50,7 @@ const Signals = ({ data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps
                                 className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
                                 placeholder={`Signal_${index + 1}`}
                             />
-                            <span className="text-primary font-semibold text-sm min-w-16 text-right">{value.toFixed(2)}</span>
+                            <span className="font-semibold text-sm min-w-16 text-right" style={{ color: frameColor }}>{value.toFixed(2)}</span>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -128,7 +131,7 @@ const Signals = ({ data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps
                                 className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
                                 placeholder="e.g. (raw * 0.1) - 40"
                             />
-                            <span className="text-[11px] text-muted-foreground/90">Decoded raw uses selected endianness first. If transform is empty/invalid, value = raw * scale + offset.</span>
+                            <span className="text-[11px] text-muted-foreground/90">Start bit indexing is right-to-left in the byte expander. Decoded raw uses selected endianness first. If transform is empty/invalid, value = raw * scale + offset.</span>
                         </label>
                     </div>
                 )

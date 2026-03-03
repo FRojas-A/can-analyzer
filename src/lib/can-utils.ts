@@ -142,6 +142,16 @@ const hslToHex = (hue: number, saturation: number, lightness: number) => {
   return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
 };
 
+export const hasSelectedBitInByte = (byteIndex: number, selectedBits: Set<number>, data: number[]) => {
+  const targetLogicalByteIndex = data.length - 1 - byteIndex
+  for (const bit of selectedBits) {
+    if (Math.floor(bit / 8) === targetLogicalByteIndex) {
+      return true
+    }
+  }
+  return false
+}
+
 export function generateStableColor(seed: string | number, offset: number = 0): string {
   const hue = modulo(hashSeed(seed) + offset * GOLDEN_ANGLE, 360);
   return hslToHex(hue, 72, 58);
@@ -150,4 +160,30 @@ export function generateStableColor(seed: string | number, offset: number = 0): 
 export function formatTimestamp(ts: number): string {
   const d = new Date(ts);
   return d.toLocaleTimeString('en-US', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+export const parseCanId = (id: string): number | null => {
+  if (id.toLowerCase().startsWith("0x")) {
+    const parsedHex = Number.parseInt(id, 16)
+    return Number.isFinite(parsedHex) ? parsedHex : null
+  }
+
+  const parsed = Number(id)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export const compareCanIds = (a: string, b: string) => {
+  const aNum = parseCanId(a)
+  const bNum = parseCanId(b)
+
+  if (aNum !== null && bNum !== null) {
+    return aNum - bNum
+  }
+  if (aNum !== null) {
+    return -1
+  }
+  if (bNum !== null) {
+    return 1
+  }
+  return a.localeCompare(b)
 }

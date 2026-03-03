@@ -42,3 +42,23 @@ export interface Recording {
   frames: RecordedFrame[];
   duration: number;
 }
+
+export type WsFrameEvent = {
+  type: "frame"
+  id: number | string
+  data: string
+  bytes?: number
+  ts?: number
+}
+
+export type WsBootstrapEvent = {
+  type: "bootstrap"
+  frames: WsFrameEvent[]
+}
+
+export type PendingFrameUpdate = {
+  event: WsFrameEvent
+  hits: number
+}
+
+export type ConnectionStatus = "connecting" | "LIVE" | "offline" | "error"
