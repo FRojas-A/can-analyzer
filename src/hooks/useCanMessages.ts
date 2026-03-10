@@ -1,21 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { TEST_CAN_MESSAGES } from "@/lib/test-data"
 import type {
   CANMessage,
   ConnectionStatus,
-  PendingFrameUpdate,
   WsBootstrapEvent,
+  WsFrameBatchEvent,
   WsFrameEvent,
+  WsSnapshotEvent,
 } from "@/types/types"
 
 const DEFAULT_WS_URL = "ws://localhost:8080"
-const DEFAULT_FRAME_FLUSH_INTERVAL_MS = 80
 const TEST_MODE_FLAGS = new Set(["1", "true", "yes", "on"])
 
 type UseCanMessagesOptions = {
   wsUrl?: string
   useTestData?: boolean
-  frameFlushIntervalMs?: number
 }
 
 const toCanId = (value: number | string): string => {
@@ -41,9 +40,10 @@ const hexToBytes = (data: string): number[] => {
     return []
   }
 
-  const bytes: number[] = []
-  for (let i = 0; i < clean.length; i += 2) {
-    bytes.push(Number.parseInt(clean.slice(i, i + 2), 16))
+  const byteCount = clean.length / 2
+  const bytes = new Array<number>(byteCount)
+  for (let i = 0, byteIndex = 0; i < clean.length; i += 2, byteIndex += 1) {
+    bytes[byteIndex] = Number.parseInt(clean.slice(i, i + 2), 16)
   }
   return bytes
 }
@@ -63,14 +63,26 @@ const applyFrameEvent = (map: Map<string, CANMessage>, event: WsFrameEvent, incr
     rate = previous.rate > 0 ? previous.rate * 0.7 + instantRate * 0.3 : instantRate
   }
 
+  const dlc = typeof event.bytes === "number" && event.bytes > 0 ? event.bytes : data.length
+  const nextRate = Number(rate.toFixed(2))
+
+  if (previous) {
+    previous.prevData = previous.data
+    previous.data = data
+    previous.timestamp = ts
+    previous.dlc = dlc
+    previous.count = count
+    previous.rate = nextRate
+    return
+  }
+
   map.set(id, {
     id,
     data,
-    prevData: previous?.data,
     timestamp: ts,
-    dlc: typeof event.bytes === "number" && event.bytes > 0 ? event.bytes : data.length,
+    dlc,
     count,
-    rate: Number(rate.toFixed(2)),
+    rate: nextRate,
   })
 }
 
@@ -89,74 +101,94 @@ const createSeededMessages = () => {
 const resolveTestMode = (value: unknown) => TEST_MODE_FLAGS.has(String(value ?? "").toLowerCase())
 
 export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
+  const messagesRef = useRef<Map<string, CANMessage>>(new Map())
   const [messages, setMessages] = useState<Map<string, CANMessage>>(new Map())
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("CONNECTING")
-  const [connectionError, setConnectionError] = useState<string | null>(null)
-  const pendingFramesRef = useRef<Map<string, PendingFrameUpdate>>(new Map())
+  const [messagesVersion, bumpMessagesVersion] = useReducer((version: number) => version + 1, 0)
+  const [liveConnectionStatus, setLiveConnectionStatus] = useState<ConnectionStatus>("CONNECTING")
+  const [liveConnectionError, setLiveConnectionError] = useState<string | null>(null)
+  const dirtyRef = useRef(false)
+  const rafIdRef = useRef<number | null>(null)
 
   const useTestData = options.useTestData ?? resolveTestMode(import.meta.env.VITE_USE_TEST_DATA)
   const wsUrl = options.wsUrl ?? import.meta.env.VITE_WS_URL ?? DEFAULT_WS_URL
-  const frameFlushIntervalMs = options.frameFlushIntervalMs ?? DEFAULT_FRAME_FLUSH_INTERVAL_MS
+  const connectionStatus: ConnectionStatus = useTestData ? "TESTING" : liveConnectionStatus
+  const connectionError = useTestData ? null : liveConnectionError
 
-  const enqueueFrameEvent = useCallback((event: WsFrameEvent) => {
-    const key = toCanId(event.id)
-    const pending = pendingFramesRef.current.get(key)
-
-    if (pending) {
-      pending.event = event
-      pending.hits += 1
+  const scheduleUiFlush = useCallback(() => {
+    if (rafIdRef.current !== null) {
       return
     }
 
-    pendingFramesRef.current.set(key, { event, hits: 1 })
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null
+      if (!dirtyRef.current) {
+        return
+      }
+
+      dirtyRef.current = false
+      setMessages(messagesRef.current)
+      bumpMessagesVersion()
+    })
   }, [])
 
-  const flushPendingFrames = useCallback(() => {
-    if (pendingFramesRef.current.size === 0) {
+  const markDirty = useCallback(() => {
+    dirtyRef.current = true
+    scheduleUiFlush()
+  }, [scheduleUiFlush])
+
+  const replaceMessages = useCallback(
+    (next: Map<string, CANMessage>) => {
+      const messages = messagesRef.current
+      messages.clear()
+      for (const [id, message] of next.entries()) {
+        messages.set(id, message)
+      }
+      markDirty()
+    },
+    [markDirty],
+  )
+
+  const applyFrames = useCallback((frames: WsFrameEvent[], hits = 1) => {
+    if (!frames.length) {
       return
     }
 
-    setMessages((prev) => {
-      if (pendingFramesRef.current.size === 0) {
-        return prev
-      }
+    const messages = messagesRef.current
+    for (const frame of frames) {
+      applyFrameEvent(messages, frame, frame.hits ?? hits)
+    }
+    markDirty()
+  }, [markDirty])
 
-      const next = new Map(prev)
-      for (const pending of pendingFramesRef.current.values()) {
-        applyFrameEvent(next, pending.event, pending.hits)
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
       }
-
-      pendingFramesRef.current.clear()
-      return next
-    })
+    }
   }, [])
 
   useEffect(() => {
     if (useTestData) {
-      setMessages(createSeededMessages())
-      setConnectionStatus("TESTING")
-      setConnectionError(null)
+      replaceMessages(createSeededMessages())
       return
     }
 
     const ws = new WebSocket(wsUrl)
-    const flushTimer = window.setInterval(flushPendingFrames, frameFlushIntervalMs)
-
-    setConnectionStatus("CONNECTING")
-    setConnectionError(null)
 
     ws.onopen = () => {
-      setConnectionStatus("LIVE")
-      setConnectionError(null)
+      setLiveConnectionStatus("LIVE")
+      setLiveConnectionError(null)
     }
 
     ws.onerror = () => {
-      setConnectionStatus("ERROR")
-      setConnectionError("Unable to reach websocket server")
+      setLiveConnectionStatus("ERROR")
+      setLiveConnectionError("Unable to reach websocket server")
     }
 
     ws.onclose = () => {
-      setConnectionStatus("OFFLINE")
+      setLiveConnectionStatus("OFFLINE")
     }
 
     ws.onmessage = (messageEvent) => {
@@ -173,7 +205,15 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
 
       const packet = parsed as { type: string }
       if (packet.type === "frame") {
-        enqueueFrameEvent(parsed as WsFrameEvent)
+        applyFrames([parsed as WsFrameEvent])
+        return
+      }
+
+      if (packet.type === "frameBatch") {
+        const batch = parsed as WsFrameBatchEvent
+        if (Array.isArray(batch.frames)) {
+          applyFrames(batch.frames)
+        }
         return
       }
 
@@ -183,25 +223,32 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
           return
         }
 
-        for (const frameEvent of bootstrap.frames) {
-          if (frameEvent?.type === "frame") {
-            enqueueFrameEvent(frameEvent)
-          }
-        }
+        applyFrames(
+          bootstrap.frames.filter((frameEvent): frameEvent is WsFrameEvent => frameEvent?.type === "frame"),
+        )
+        return
+      }
 
-        flushPendingFrames()
+      if (packet.type === "snapshot") {
+        const snapshot = parsed as WsSnapshotEvent
+        if (Array.isArray(snapshot.frames)) {
+          const seeded = new Map<string, CANMessage>()
+          for (const frame of snapshot.frames) {
+            applyFrameEvent(seeded, frame)
+          }
+          replaceMessages(seeded)
+        }
       }
     }
 
     return () => {
-      window.clearInterval(flushTimer)
-      flushPendingFrames()
       ws.close()
     }
-  }, [enqueueFrameEvent, flushPendingFrames, frameFlushIntervalMs, useTestData, wsUrl])
+  }, [applyFrames, replaceMessages, useTestData, wsUrl])
 
   return {
     messages,
+    messagesVersion,
     connectionStatus,
     connectionError,
   }

@@ -49,11 +49,23 @@ export type WsFrameEvent = {
   data: string
   bytes?: number
   ts?: number
+  hits?: number
 }
 
 export type WsBootstrapEvent = {
   type: "bootstrap"
   frames: WsFrameEvent[]
+}
+
+export type WsFrameBatchEvent = {
+  type: "frameBatch"
+  frames: WsFrameEvent[]
+}
+
+export type WsSnapshotEvent = {
+  type: "snapshot"
+  frames?: WsFrameEvent[]
+  [key: string]: unknown
 }
 
 export type PendingFrameUpdate = {

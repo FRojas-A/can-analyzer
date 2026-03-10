@@ -9,7 +9,9 @@ import { WebSocketServer } from "ws";
 const WS_PORT = Number(process.env.WS_PORT || 8080);
 const SERIAL_BAUD = Number(process.env.SERIAL_BAUD || 115200);
 const HOT_BUFFER_MAX = Number(process.env.HOT_BUFFER_MAX || 3000);
-const HOT_BOOTSTRAP_LIMIT = Number(process.env.HOT_BOOTSTRAP_LIMIT || 250);
+const FRAME_BROADCAST_INTERVAL_MS = Number(
+  process.env.FRAME_BROADCAST_INTERVAL_MS || 40,
+);
 const CLIENT_BACKPRESSURE_BYTES = Number(
   process.env.CLIENT_BACKPRESSURE_BYTES || 1_000_000,
 );
@@ -27,6 +29,9 @@ const clients = new Set();
 const latestById = new Map();
 const hotBuffer = [];
 const completedRecordings = [];
+const dirtyFrames = new Map();
+
+let flushDirtyTimer = null;
 
 const deviceStats = {
   received: 0,
@@ -71,6 +76,45 @@ function pushHot(frameEvent) {
   if (hotBuffer.length > HOT_BUFFER_MAX) {
     hotBuffer.shift();
   }
+}
+
+function flushDirtyFrames() {
+  if (dirtyFrames.size === 0) {
+    return;
+  }
+
+  const frames = [];
+  for (const [id, meta] of dirtyFrames.entries()) {
+    const latest = latestById.get(id);
+    if (!latest) {
+      continue;
+    }
+
+    frames.push({ ...latest, hits: meta.hits });
+  }
+
+  dirtyFrames.clear();
+
+  if (frames.length > 0) {
+    broadcast({ type: "frameBatch", frames });
+  }
+}
+
+function startDirtyFlushTimer() {
+  if (flushDirtyTimer) {
+    return;
+  }
+
+  flushDirtyTimer = setInterval(flushDirtyFrames, FRAME_BROADCAST_INTERVAL_MS);
+}
+
+function stopDirtyFlushTimer() {
+  if (!flushDirtyTimer) {
+    return;
+  }
+
+  clearInterval(flushDirtyTimer);
+  flushDirtyTimer = null;
 }
 
 function bytesFromHex(hexData) {
@@ -183,6 +227,7 @@ function buildHealthPayload() {
       bytesWritten: recording.bytesWritten,
       frameCount: recording.frameCount,
     },
+    frames: Array.from(latestById.values()),
   };
 }
 
@@ -365,8 +410,6 @@ function handleSerialLine(line) {
   const prev = latestById.get(frame.id);
   const diff = buildDiff(prev ? prev.data : null, frame.data);
 
-  latestById.set(frame.id, frame);
-
   const event = {
     type: "frame",
     seq,
@@ -379,7 +422,16 @@ function handleSerialLine(line) {
 
   pushHot(event);
   appendRecording(event);
-  broadcast(event);
+
+  const existingDirty = dirtyFrames.get(frame.id);
+  if (existingDirty) {
+    existingDirty.hits += 1;
+  } else {
+    dirtyFrames.set(frame.id, { hits: 1 });
+  }
+
+  latestById.set(frame.id, event);
+  startDirtyFlushTimer();
 }
 
 async function resolveSerialPath() {
@@ -489,6 +541,7 @@ function buildSnapshot() {
       bytesWritten: recording.bytesWritten,
       frameCount: recording.frameCount,
     },
+    frames: Array.from(latestById.values()),
   };
 }
 
@@ -614,17 +667,6 @@ wss.on("connection", (ws) => {
   );
 
   safeSend(ws, JSON.stringify(buildSnapshot()));
-
-  const bootstrap = hotBuffer.slice(-HOT_BOOTSTRAP_LIMIT);
-  if (bootstrap.length) {
-    safeSend(
-      ws,
-      JSON.stringify({
-        type: "bootstrap",
-        frames: bootstrap,
-      }),
-    );
-  }
 
   ws.on("message", (raw) => {
     let data;

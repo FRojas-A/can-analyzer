@@ -1,40 +1,43 @@
 import React from "react"
 import { Eye, EyeOff } from "lucide-react"
-import type { CANMessage } from "@/types/types";
-import { byteToHex, formatTimestamp, getChangedBytes } from "@/lib/can-utils";
-import Button from "../ui/button";
+import { byteToHex, formatTimestamp, getChangedBytes } from "@/lib/can-utils"
+import Button from "../ui/button"
 
 interface FrameRowProps {
-  message: CANMessage;
-  frameColor: string;
-  selectedIds: Set<string>;
-  hiddenIds: Set<string>;
-  onToggleSelect: (id: string) => void;
-  onToggleHide: (id: string) => void;
+  id: string
+  data: number[]
+  prevData?: number[]
+  timestamp: number
+  dlc: number
+  count: number
+  rate: number
+  frameColor: string
+  isSelected: boolean
+  isHidden: boolean
+  onToggleSelect: (id: string) => void
+  onToggleHide: (id: string) => void
 }
 
-const FrameRow = React.forwardRef<HTMLTableRowElement, FrameRowProps>(({ message, frameColor, selectedIds, hiddenIds, onToggleSelect, onToggleHide }, ref) => {
-    const changed = getChangedBytes(message.data, message.prevData);
-    const isSelected = selectedIds.has(message.id);
-    const isHidden = hiddenIds.has(message.id);
+const FrameRow = React.memo(({ id, data, prevData, timestamp, dlc, count, rate, frameColor, isSelected, isHidden, onToggleSelect, onToggleHide }: FrameRowProps) => {
+    const changed = React.useMemo(() => getChangedBytes(data, prevData), [data, prevData])
 
     return (
-        <tr ref={ref}
+        <tr
             className={`
                   border-b border-border/50 cursor-pointer transition-colors text-sm
                   ${isSelected ? 'border-l-2' : 'hover:bg-muted/50'}
                   ${isHidden ? 'opacity-40' : ''}
                 `}
             style={isSelected ? { borderLeftColor: frameColor, backgroundColor: `${frameColor}1A` } : undefined}
-            onClick={() => onToggleSelect(message.id)}>
+            onClick={() => onToggleSelect(id)}>
             <td className="px-3 py-1.5">
                 <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
-                        onToggleHide(message.id);
-                        e.stopPropagation();
+                        onToggleHide(id)
+                        e.stopPropagation()
                     }}
                 >
                     {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -50,12 +53,12 @@ const FrameRow = React.forwardRef<HTMLTableRowElement, FrameRowProps>(({ message
                 className={`px-3 py-1.5 font-semibold ${isSelected ? '' : 'text-muted-foreground'}`}
                 style={isSelected ? { color: frameColor } : undefined}
             >
-                {message.id}
+                {id}
             </td>
-            <td className="px-3 py-1.5 text-muted-foreground">{message.dlc}</td>
+            <td className="px-3 py-1.5 text-muted-foreground">{dlc}</td>
             <td className="px-3 py-1.5">
                 <div className="flex gap-1">
-                    {message.data.map((byte, i) => (
+                    {data.map((byte, i) => (
                     <span
                         key={i}
                         className={`
@@ -68,11 +71,11 @@ const FrameRow = React.forwardRef<HTMLTableRowElement, FrameRowProps>(({ message
                     ))}
                 </div>
             </td>
-            <td className="px-3 py-1.5 text-muted-foreground">{message.count}</td>
-            <td className="px-3 py-1.5 text-muted-foreground">{message.rate.toFixed(1)} Hz</td>
-            <td className="px-3 py-1.5 text-muted-foreground">{formatTimestamp(message.timestamp)}</td>
+            <td className="px-3 py-1.5 text-muted-foreground">{count}</td>
+            <td className="px-3 py-1.5 text-muted-foreground">{rate.toFixed(1)} Hz</td>
+            <td className="px-3 py-1.5 text-muted-foreground">{formatTimestamp(timestamp)}</td>
         </tr>
     )
-});
+})
 
 export default FrameRow

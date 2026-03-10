@@ -9,13 +9,13 @@ import { useFrameUiState } from "./hooks/useFrameUiState"
 const FALLBACK_FRAME_COLOR = "#4FA6F8"
 
 function App() {
-  const { messages, connectionStatus, connectionError } = useCanMessages()
+  const { messages, messagesVersion, connectionStatus, connectionError } = useCanMessages()
   const {
     selectedIds,
     hiddenIds,
     showHidden,
     selectedFrames,
-    visibleMessages,
+    visibleCount,
     selectedSignalCount,
     frameColorById,
     toggleShowHidden,
@@ -24,10 +24,10 @@ function App() {
     toggleHideFrame,
     handleSignalCountChange,
     handleFrameColorChange,
-  } = useFrameUiState(messages)
+  } = useFrameUiState(messages, messagesVersion)
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr] grid-cols-1 lg:grid-cols-[2fr_1fr]">
+    <div className="grid h-screen grid-rows-[auto_2fr_1fr] grid-cols-1 lg:grid-cols-[2fr_1fr]">
       <TopNav
         connectionStatus={connectionStatus}
         hiddenCount={hiddenIds.size}
@@ -38,7 +38,7 @@ function App() {
       <section className="col-span-1 overflow-hidden border-r border-border flex flex-col">
         <div className="flex items-center justify-between px-3 py-1 border-b border-border text-xs">
           <span className="text-muted-foreground py-3">
-            Frames: {visibleMessages.size}/{messages.size} · Hidden: {hiddenIds.size} · Selected: {selectedIds.size} · Signals: {selectedSignalCount}
+            Frames: {visibleCount}/{messages.size} · Hidden: {hiddenIds.size} · Selected: {selectedIds.size} · Signals: {selectedSignalCount}
           </span>
           {selectedIds.size > 0 && (
             <Button
@@ -55,9 +55,11 @@ function App() {
         {connectionError && <div className="px-3 py-1 text-xs text-destructive border-b border-border">{connectionError}</div>}
 
         <LiveTable
-          messages={visibleMessages}
+          messages={messages}
+          messagesVersion={messagesVersion}
           selectedIds={selectedIds}
           hiddenIds={hiddenIds}
+          showHidden={showHidden}
           frameColors={frameColorById}
           onToggleSelect={toggleSelect}
           onToggleHide={toggleHideFrame}
@@ -81,6 +83,10 @@ function App() {
           ))
         )}
       </aside>
+
+      <section className="col-span-2 overflow-y-auto p-2 border-t border-border">
+        <div className="p-4 text-sm text-muted-foreground">Signal analysis coming soon...</div>
+      </section>
     </div>
   )
 }

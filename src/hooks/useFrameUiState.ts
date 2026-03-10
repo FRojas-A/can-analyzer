@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { compareCanIds, generateStableColor } from "@/lib/can-utils"
 import type { CANMessage } from "@/types/types"
 
-export const useFrameUiState = (messages: Map<string, CANMessage>) => {
+export const useFrameUiState = (messages: Map<string, CANMessage>, messagesVersion: number) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
@@ -12,20 +12,22 @@ export const useFrameUiState = (messages: Map<string, CANMessage>) => {
 
   useEffect(() => {
     setFrameColorById((prev) => {
-      let changed = false
-      const next = { ...prev }
+      let next: Record<string, string> | null = null
 
       for (const id of messages.keys()) {
-        if (!next[id]) {
+        if (!prev[id]) {
+          if (!next) {
+            next = { ...prev }
+          }
+
           next[id] = generateStableColor("frame", nextFrameColorIndexRef.current)
           nextFrameColorIndexRef.current += 1
-          changed = true
         }
       }
 
-      return changed ? next : prev
+      return next ?? prev
     })
-  }, [messages])
+  }, [messages, messagesVersion])
 
   const toggleShowHidden = useCallback(() => {
     setShowHidden((current) => !current)
@@ -84,19 +86,22 @@ export const useFrameUiState = (messages: Map<string, CANMessage>) => {
     }
   }, [hiddenIds])
 
-  const visibleMessages = useMemo(() => {
+  const visibleCount = useMemo(() => {
+    void messagesVersion
+
     if (showHidden) {
-      return messages
+      return messages.size
     }
 
-    const filtered = new Map<string, CANMessage>()
-    for (const [id, message] of messages.entries()) {
+    let count = 0
+    for (const id of messages.keys()) {
       if (!hiddenIds.has(id)) {
-        filtered.set(id, message)
+        count += 1
       }
     }
-    return filtered
-  }, [hiddenIds, messages, showHidden])
+
+    return count
+  }, [hiddenIds, messages, messagesVersion, showHidden])
 
   const selectedSignalCount = useMemo(() => {
     let total = 0
@@ -131,19 +136,21 @@ export const useFrameUiState = (messages: Map<string, CANMessage>) => {
   }, [])
 
   const selectedFrames = useMemo(() => {
+    void messagesVersion
+
     return Array.from(selectedIds)
       .map((id) => messages.get(id))
       .filter((frame): frame is CANMessage => Boolean(frame))
       .filter((frame) => showHidden || !hiddenIds.has(frame.id))
       .sort((a, b) => compareCanIds(a.id, b.id))
-  }, [hiddenIds, messages, selectedIds, showHidden])
+  }, [hiddenIds, messages, messagesVersion, selectedIds, showHidden])
 
   return {
     selectedIds,
     hiddenIds,
     showHidden,
     selectedFrames,
-    visibleMessages,
+    visibleCount,
     selectedSignalCount,
     frameColorById,
     toggleShowHidden,

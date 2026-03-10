@@ -5,18 +5,22 @@ import { compareCanIds } from "@/lib/can-utils";
 
 interface Props {
   messages: Map<string, CANMessage>;
+  messagesVersion: number;
   selectedIds: Set<string>;
   hiddenIds: Set<string>;
+  showHidden: boolean;
   frameColors: Record<string, string>;
   onToggleSelect: (id: string) => void;
   onToggleHide: (id: string) => void;
 }
 
-const LiveTable = ({ messages, selectedIds, hiddenIds, frameColors, onToggleSelect, onToggleHide }: Props) => {
+const LiveTable = ({ messages, messagesVersion, selectedIds, hiddenIds, showHidden, frameColors, onToggleSelect, onToggleHide }: Props) => {
     const listRef = React.useRef<HTMLDivElement>(null);
 
-    const sortedMessages = Array.from(messages.values())
-        .sort((a, b) => compareCanIds(a.id, b.id));
+    const sortedMessages = React.useMemo(() => {
+        void messagesVersion;
+        return Array.from(messages.values()).sort((a, b) => compareCanIds(a.id, b.id));
+    }, [messages, messagesVersion]);
 
     return (
         <div ref={listRef} className="flex-1 overflow-auto">
@@ -35,13 +39,23 @@ const LiveTable = ({ messages, selectedIds, hiddenIds, frameColors, onToggleSele
                 </thead>
                 <tbody>
                 {sortedMessages.map(msg => {
+                    if (!showHidden && hiddenIds.has(msg.id)) {
+                        return null;
+                    }
+
                     return (
                       <FrameRow
                         key={msg.id}
-                        message={msg}
+                        id={msg.id}
+                        data={msg.data}
+                        prevData={msg.prevData}
+                        timestamp={msg.timestamp}
+                        dlc={msg.dlc}
+                        count={msg.count}
+                        rate={msg.rate}
                         frameColor={frameColors[msg.id] ?? "#4FA6F8"}
-                        selectedIds={selectedIds}
-                        hiddenIds={hiddenIds}
+                        isSelected={selectedIds.has(msg.id)}
+                        isHidden={hiddenIds.has(msg.id)}
                         onToggleSelect={onToggleSelect}
                         onToggleHide={onToggleHide}
                       />

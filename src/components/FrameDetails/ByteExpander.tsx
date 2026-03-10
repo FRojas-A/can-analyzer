@@ -25,7 +25,7 @@ const ByteExpander = ({
     const logicalByteIndex = (byteIndex: number) => data.length - 1 - byteIndex
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-3 w-full">
             <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 w-full">
                 {data.map((byte, byteIndex) => {
                     const isExpanded = expandedByte === byteIndex
