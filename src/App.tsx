@@ -5,40 +5,56 @@ import Button from "./components/ui/button"
 import Card from "./components/ui/card"
 import { useCanMessages } from "./hooks/useCanMessages"
 import { useFrameUiState } from "./hooks/useFrameUiState"
+import { useVehicleProfile } from "./hooks/useVehicleProfile"
 
 const FALLBACK_FRAME_COLOR = "#4FA6F8"
 
 function App() {
   const { messages, messagesVersion, connectionStatus, connectionError } = useCanMessages()
+  const vehicleProfile = useVehicleProfile()
+
   const {
     selectedIds,
-    hiddenIds,
     showHidden,
     selectedFrames,
     visibleCount,
     selectedSignalCount,
-    frameColorById,
     toggleShowHidden,
     toggleSelect,
     hideSelectedFrames,
     toggleHideFrame,
-    handleSignalCountChange,
-    handleFrameColorChange,
-  } = useFrameUiState(messages, messagesVersion)
+  } = useFrameUiState(messages, messagesVersion, {
+    hiddenIds: vehicleProfile.hiddenIds,
+    frameColorById: vehicleProfile.frameColorById,
+    signalsByFrameId: vehicleProfile.signalsByFrameId,
+    toggleHideFrame: vehicleProfile.toggleHideFrame,
+    hideFrames: vehicleProfile.hideFrames,
+    assignFrameColor: vehicleProfile.assignFrameColor,
+  })
+
+  if (!vehicleProfile.hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+        Loading profile...
+      </div>
+    )
+  }
 
   return (
     <div className="grid h-screen grid-rows-[auto_2fr_1fr] grid-cols-1 lg:grid-cols-[2fr_1fr]">
       <TopNav
         connectionStatus={connectionStatus}
-        hiddenCount={hiddenIds.size}
+        hiddenCount={vehicleProfile.hiddenIds.size}
         showHidden={showHidden}
         onToggleShowHidden={toggleShowHidden}
+        onExportProfile={vehicleProfile.exportProfile}
+        onImportProfile={vehicleProfile.importProfile}
       />
 
       <section className="col-span-1 overflow-hidden border-r border-border flex flex-col">
         <div className="flex items-center justify-between px-3 py-1 border-b border-border text-xs">
           <span className="text-muted-foreground py-3">
-            Frames: {visibleCount}/{messages.size} · Hidden: {hiddenIds.size} · Selected: {selectedIds.size} · Signals: {selectedSignalCount}
+            Frames: {visibleCount}/{messages.size} · Hidden: {vehicleProfile.hiddenIds.size} · Selected: {selectedIds.size} · Signals: {selectedSignalCount}
           </span>
           {selectedIds.size > 0 && (
             <Button
@@ -53,14 +69,15 @@ function App() {
           )}
         </div>
         {connectionError && <div className="px-3 py-1 text-xs text-destructive border-b border-border">{connectionError}</div>}
+        {vehicleProfile.storageError && <div className="px-3 py-1 text-xs text-destructive border-b border-border">{vehicleProfile.storageError}</div>}
 
         <LiveTable
           messages={messages}
           messagesVersion={messagesVersion}
           selectedIds={selectedIds}
-          hiddenIds={hiddenIds}
+          hiddenIds={vehicleProfile.hiddenIds}
           showHidden={showHidden}
-          frameColors={frameColorById}
+          frameColors={vehicleProfile.frameColorById}
           onToggleSelect={toggleSelect}
           onToggleHide={toggleHideFrame}
         />
@@ -76,9 +93,10 @@ function App() {
             <FrameDetails
               key={frame.id}
               frame={frame}
-              frameColor={frameColorById[frame.id] ?? FALLBACK_FRAME_COLOR}
-              onFrameColorChange={handleFrameColorChange}
-              onSignalCountChange={handleSignalCountChange}
+              frameColor={vehicleProfile.frameColorById[frame.id] ?? FALLBACK_FRAME_COLOR}
+              signals={vehicleProfile.signalsByFrameId[frame.id] ?? []}
+              onUpdateSignals={(updater) => vehicleProfile.updateSignalsForFrame(frame.id, updater)}
+              onFrameColorChange={vehicleProfile.setFrameColor}
             />
           ))
         )}
