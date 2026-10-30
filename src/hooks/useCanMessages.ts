@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { FrameCaptureBuffer } from "@/lib/capture"
-import { TEST_CAN_MESSAGES, seedTestCapture } from "@/lib/test-data"
+import { TEST_CAN_MESSAGES, seedTestCapture, testFrameDataAt } from "@/lib/test-data"
 import type {
   CANMessage,
   ConnectionStatus,
@@ -15,6 +15,7 @@ const TEST_MODE_FLAGS = new Set(["1", "true", "yes", "on"])
 const CAPTURE_MAX_MS = 120_000
 const CAPTURE_MAX_FRAMES = 500_000
 const CAPTURE_VERSION_INTERVAL_MS = 250
+const SIM_TICK_MS = 50
 
 type UseCanMessagesOptions = {
   wsUrl?: string
@@ -212,11 +213,11 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   useEffect(() => {
     if (useTestData) {
       replaceMessages(createSeededMessages())
+      capture.clear()
       seedTestCapture(capture)
       captureDirtyRef.current = true
       return
     }
-
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
@@ -287,6 +288,43 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
       ws.close()
     }
   }, [applyFrames, capture, replaceMessages, useTestData, wsUrl])
+
+  useEffect(() => {
+    if (!useTestData) {
+      return
+    }
+
+    const nextTs = new Map<string, number>()
+    let simTs = Date.now()
+    const timer = window.setInterval(() => {
+      simTs += SIM_TICK_MS
+      const frames: WsFrameEvent[] = []
+
+      for (const message of TEST_CAN_MESSAGES) {
+        const periodMs = 1000 / Math.max(1, message.rate)
+        let last = nextTs.get(message.id) ?? simTs
+        while (last <= simTs) {
+          const data = testFrameDataAt(last)
+          const hex = Array.from(data, (byte) => byte.toString(16).padStart(2, "0")).join("")
+          frames.push({
+            type: "frame",
+            id: Number.parseInt(message.id, 16),
+            data: hex,
+            bytes: 8,
+            ts: Math.round(last),
+          })
+          last += periodMs
+        }
+        nextTs.set(message.id, last)
+      }
+
+      if (frames.length > 0) {
+        applyFrames(frames, 1, true)
+      }
+    }, SIM_TICK_MS)
+
+    return () => window.clearInterval(timer)
+  }, [applyFrames, useTestData])
 
   return {
     messages,
