@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { compareCanIds } from "./lib/can-utils"
 import FrameDetails from "./components/FrameDetails/FrameDetails"
@@ -10,7 +10,7 @@ import Card from "./components/ui/card"
 import { useCanMessages } from "./hooks/useCanMessages"
 import { useFrameUiState } from "./hooks/useFrameUiState"
 import { useVehicleProfile } from "./hooks/useVehicleProfile"
-import type { ChartSignal } from "./types/types"
+import type { ChartSignal, SignalFocus } from "./types/types"
 
 const FALLBACK_FRAME_COLOR = "#4FA6F8"
 
@@ -38,6 +38,7 @@ function App() {
     signalCount,
     toggleShowHidden,
     toggleSelect,
+    selectFrame,
     toggleSelectedVisibility,
     toggleHideFrame,
   } = useFrameUiState(messages, messagesVersion, {
@@ -74,6 +75,24 @@ function App() {
     }
     return list
   }, [messages, messagesVersion, vehicleProfile.frameColorById, vehicleProfile.signalsByFrameId])
+
+  const { unhideFrames } = vehicleProfile
+
+  const [signalFocus, setSignalFocus] = useState<SignalFocus | null>(null)
+
+  const handleLegendSelect = useCallback(
+    (key: string) => {
+      const target = chartSignals.find((signal) => signal.key === key)
+      if (!target) {
+        return
+      }
+
+      unhideFrames([target.frameId])
+      selectFrame(target.frameId)
+      setSignalFocus({ frameId: target.frameId, key, nonce: Date.now() })
+    },
+    [chartSignals, selectFrame, unhideFrames],
+  )
 
   if (!vehicleProfile.hydrated) {
     return (
@@ -165,6 +184,11 @@ function App() {
               signals={vehicleProfile.signalsByFrameId[frame.id] ?? []}
               onUpdateSignals={(updater) => vehicleProfile.updateSignalsForFrame(frame.id, updater)}
               onFrameColorChange={vehicleProfile.setFrameColor}
+              signalFocus={
+                signalFocus?.frameId === frame.id
+                  ? { key: signalFocus.key, nonce: signalFocus.nonce }
+                  : null
+              }
             />
           ))
         )}
@@ -176,6 +200,7 @@ function App() {
           capture={capture}
           captureVersion={captureVersion}
           onClearCapture={clearCapture}
+          onSelectSignal={handleLegendSelect}
         />
       </section>
     </div>

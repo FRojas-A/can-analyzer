@@ -1,19 +1,31 @@
-import { toNumber } from "@/lib/utils"
+import { useEffect, useRef } from "react"
+import { toNumber, cn } from "@/lib/utils"
 import { evaluateTransform, extractSignalValue } from "@/lib/can-utils"
 import type { Endianness, SignalConfig } from "@/types/types"
 import { X } from "lucide-react"
 import Button from "../ui/button"
 
 interface SignalsProps {
+    frameId: string
     frameColor: string
     data: number[]
     signals: SignalConfig[]
+    highlightKey?: string | null
+    highlightNonce?: number
     onUpdateSignal: (signalIndex: number, nextSignal: SignalConfig) => void
     onRemoveSignal: (signalIndex: number) => void
 }
 
 
-const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+const Signals = ({ frameId, frameColor, data, signals, highlightKey, highlightNonce, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+    const highlightedRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (highlightKey && highlightedRef.current) {
+            highlightedRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" })
+        }
+    }, [highlightKey, highlightNonce, signals.length])
+
     if (signals.length === 0) {
         return <div className="w-full rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No signals yet. Select bits and click Add Signal.</div>
     }
@@ -34,9 +46,18 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                     0
                 )
                 const value = evaluateTransform(rawValue, signal.transform, signal.scale, signal.offset)
+                const rowKey = `${frameId}:${index}:${signal.name}`
+                const highlighted = highlightKey === rowKey
 
                 return (
-                    <div key={`${signal.name}-${index}`} className="w-full rounded-lg border border-border bg-card/50 p-3 space-y-2">
+                    <div
+                        key={rowKey}
+                        ref={highlighted ? highlightedRef : undefined}
+                        className={cn(
+                            "w-full rounded-lg border border-border bg-card/50 p-3 space-y-2",
+                            highlighted && "ring-1 ring-primary bg-primary/5"
+                        )}
+                    >
                         <div className="flex items-center gap-2">
                             <span
                                 className="h-2.5 w-2.5 rounded-full border border-border"

@@ -42,6 +42,10 @@ export const useFrameUiState = (
     )
   }, [])
 
+  const selectFrame = useCallback((id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }, [])
+
   const selectedIdsSet = useMemo(() => new Set(selectedIds), [selectedIds])
 
   const selectionMode: SelectionActionMode = useMemo(() => {
@@ -124,6 +128,7 @@ export const useFrameUiState = (
     signalCount,
     toggleShowHidden,
     toggleSelect,
+    selectFrame,
     toggleSelectedVisibility,
     toggleHideFrame: toggleHideFrameSelection,
   }

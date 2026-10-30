@@ -59,6 +59,12 @@ export interface ChartSignal {
   transform?: string;
 }
 
+export interface SignalFocus {
+  frameId: string;
+  key: string;
+  nonce: number;
+}
+
 export interface RecordedFrame {
   id: string;
   data: number[];

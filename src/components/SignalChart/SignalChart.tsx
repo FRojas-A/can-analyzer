@@ -12,11 +12,12 @@ interface SignalChartProps {
   capture: FrameCaptureBuffer
   captureVersion: number
   onClearCapture: () => void
+  onSelectSignal?: (key: string) => void
 }
 
 const LIVE_WINDOW_MS = 10_000
 
-const SignalChart = ({ signals, capture, captureVersion, onClearCapture }: SignalChartProps) => {
+const SignalChart = ({ signals, capture, captureVersion, onClearCapture, onSelectSignal }: SignalChartProps) => {
   const [live, setLive] = useState(true)
   const [window, setWindow] = useState<{ start: number; end: number } | null>(null)
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set())
@@ -140,6 +141,7 @@ const SignalChart = ({ signals, capture, captureVersion, onClearCapture }: Signa
             signals={signals}
             hiddenKeys={hiddenKeys}
             onToggleVisibility={toggleSignal}
+            onSelectSignal={onSelectSignal}
           />
         )}
       </div>
