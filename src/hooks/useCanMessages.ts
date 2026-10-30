@@ -112,6 +112,8 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   const [liveConnectionStatus, setLiveConnectionStatus] = useState<ConnectionStatus>("CONNECTING")
   const [liveConnectionError, setLiveConnectionError] = useState<string | null>(null)
   const [captureVersion, setCaptureVersion] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const pausedRef = useRef(false)
   const [capture] = useState(() => new FrameCaptureBuffer())
   const captureDirtyRef = useRef(false)
   const dirtyRef = useRef(false)
@@ -157,7 +159,7 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   )
 
   const applyFrames = useCallback((frames: WsFrameEvent[], hits = 1, record = false) => {
-    if (!frames.length) {
+    if (pausedRef.current || !frames.length) {
       return
     }
 
@@ -190,6 +192,11 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     captureDirtyRef.current = true
     setCaptureVersion((current) => current + 1)
   }, [capture])
+
+  const togglePause = useCallback(() => {
+    pausedRef.current = !pausedRef.current
+    setPaused(pausedRef.current)
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -334,5 +341,7 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     capture,
     captureVersion,
     clearCapture,
+    paused,
+    togglePause,
   }
 }

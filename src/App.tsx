@@ -15,7 +15,17 @@ import type { ChartSignal } from "./types/types"
 const FALLBACK_FRAME_COLOR = "#4FA6F8"
 
 function App() {
-  const { messages, messagesVersion, connectionStatus, connectionError, capture, captureVersion, clearCapture } = useCanMessages()
+  const {
+    messages,
+    messagesVersion,
+    connectionStatus,
+    connectionError,
+    capture,
+    captureVersion,
+    clearCapture,
+    paused,
+    togglePause,
+  } = useCanMessages()
   const vehicleProfile = useVehicleProfile()
 
   const {
@@ -77,6 +87,8 @@ function App() {
     <div className="grid h-screen grid-rows-[auto_2fr_1fr] grid-cols-1 lg:grid-cols-[2fr_1fr]">
       <TopNav
         connectionStatus={connectionStatus}
+        paused={paused}
+        onTogglePause={togglePause}
         onExportProfile={vehicleProfile.exportProfile}
         onImportProfile={vehicleProfile.importProfile}
       />

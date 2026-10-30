@@ -1,16 +1,20 @@
-import { Activity, Circle, Download, Radio, Upload } from "lucide-react";
+import { Activity, Circle, Download, Pause, Play, Upload } from "lucide-react";
 import { useRef } from "react";
 import Button from "../ui/button";
 import type { ConnectionStatus } from "@/types/types";
 
 interface TopNavProps {
     connectionStatus: ConnectionStatus
+    paused: boolean
+    onTogglePause: () => void
     onExportProfile: () => void
     onImportProfile: (file: File) => void
 }
 
 export default function TopNav({
     connectionStatus,
+    paused,
+    onTogglePause,
     onExportProfile,
     onImportProfile,
 }: TopNavProps) {
@@ -63,8 +67,14 @@ export default function TopNav({
                 <Button variant="outline" size="sm" className="text-xs border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
                     <Circle size={12} className="mr-1 fill-current" /> Record
                 </Button>
-                <Button variant="ghost" size="sm" className="text-xs">
-                    <Radio size={12} className="mr-1" /> Pause
+                <Button
+                    variant={paused ? "secondary" : "ghost"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={onTogglePause}
+                >
+                    {paused ? <Play size={12} className="mr-1" /> : <Pause size={12} className="mr-1" />}
+                    {paused ? "Resume" : "Pause"}
                 </Button>
             </div>
         </header>
