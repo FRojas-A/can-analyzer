@@ -93,6 +93,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
         }
 
         const newSignal: SignalConfig = {
+            id: crypto.randomUUID(),
             name: `Signal_${signalNumber}`,
             startBit: selectionEnd ?? selectionStart,
             bitLength: selectionLength,
@@ -215,7 +216,6 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
                     ) : (
                         <div className="py-2 px-4">
                             <Signals
-                                frameId={frame.id}
                                 frameColor={frameColor}
                                 data={displayData}
                                 signals={signals}

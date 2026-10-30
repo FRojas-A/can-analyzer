@@ -6,7 +6,6 @@ import { X } from "lucide-react"
 import Button from "../ui/button"
 
 interface SignalsProps {
-    frameId: string
     frameColor: string
     data: number[]
     signals: SignalConfig[]
@@ -17,7 +16,7 @@ interface SignalsProps {
 }
 
 
-const Signals = ({ frameId, frameColor, data, signals, highlightKey, highlightNonce, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
     const highlightedRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -46,12 +45,11 @@ const Signals = ({ frameId, frameColor, data, signals, highlightKey, highlightNo
                     0
                 )
                 const value = evaluateTransform(rawValue, signal.transform, signal.scale, signal.offset)
-                const rowKey = `${frameId}:${index}:${signal.name}`
-                const highlighted = highlightKey === rowKey
+                const highlighted = highlightKey === signal.id
 
                 return (
                     <div
-                        key={rowKey}
+                        key={signal.id}
                         ref={highlighted ? highlightedRef : undefined}
                         className={cn(
                             "w-full rounded-lg border border-border bg-card/50 p-3 space-y-2",

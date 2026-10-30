@@ -63,7 +63,10 @@ export function normalizeProfile(input: unknown): VehicleProfile | null {
   if (isRecord(input.signalsByFrameId)) {
     for (const [frameId, signals] of Object.entries(input.signalsByFrameId)) {
       if (Array.isArray(signals) && signals.every(isSignalConfig)) {
-        signalsByFrameId[frameId] = signals
+        signalsByFrameId[frameId] = signals.map((signal) => ({
+          ...signal,
+          id: typeof signal.id === "string" && signal.id !== "" ? signal.id : crypto.randomUUID(),
+        }))
       }
     }
   }

@@ -11,6 +11,7 @@ export interface CANMessage {
 export type Endianness = 'big' | 'little';
 
 export interface SignalConfig {
+  id: string;
   name: string;
   startBit: number;
   bitLength: number;

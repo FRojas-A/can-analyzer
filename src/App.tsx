@@ -58,9 +58,9 @@ function App() {
     for (const frameId of frameIds) {
       const signals = vehicleProfile.signalsByFrameId[frameId] ?? []
       const frameColor = vehicleProfile.frameColorById[frameId] ?? FALLBACK_FRAME_COLOR
-      signals.forEach((signal, index) => {
+      signals.forEach((signal) => {
         list.push({
-          key: `${frameId}:${index}:${signal.name}`,
+          key: signal.id,
           frameId,
           name: signal.name,
           color: signal.color ?? frameColor,
