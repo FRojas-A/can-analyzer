@@ -24,6 +24,50 @@ export function getChangedBits(current: number[], previous?: number[]): boolean[
   return bits;
 }
 
+interface BitLocation {
+  logicalByteIdx: number;
+  bitIdx: number;
+}
+
+const getSignalBitLocations = (
+  startBit: number,
+  bitLength: number,
+  endianness: Endianness
+): BitLocation[] => {
+  const locations: BitLocation[] = [];
+
+  for (let i = 0; i < bitLength; i++) {
+    if (endianness === 'little') {
+      const bitPos = startBit + i;
+      locations.push({ logicalByteIdx: Math.floor(bitPos / 8), bitIdx: bitPos % 8 });
+    } else {
+      const firstByteBits = (startBit % 8) + 1;
+      let logicalByteIdx: number;
+      let bitIdx: number;
+      if (i < firstByteBits) {
+        logicalByteIdx = Math.floor(startBit / 8);
+        bitIdx = (startBit % 8) - i;
+      } else {
+        const remaining = i - firstByteBits;
+        logicalByteIdx = Math.floor(startBit / 8) + 1 + Math.floor(remaining / 8);
+        bitIdx = 7 - (remaining % 8);
+      }
+      locations.push({ logicalByteIdx, bitIdx });
+    }
+  }
+
+  return locations;
+};
+
+export const getSignalBitPositions = (
+  startBit: number,
+  bitLength: number,
+  endianness: Endianness
+): number[] =>
+  getSignalBitLocations(startBit, bitLength, endianness).map(
+    ({ logicalByteIdx, bitIdx }) => logicalByteIdx * 8 + bitIdx
+  );
+
 export function extractSignalValue(
   data: number[],
   startBit: number,
@@ -32,30 +76,16 @@ export function extractSignalValue(
   scale: number = 1,
   offset: number = 0
 ): number {
+  const locations = getSignalBitLocations(startBit, bitLength, endianness);
   let rawValue = 0;
 
-  if (endianness === 'little') {
-    for (let i = 0; i < bitLength; i++) {
-      const bitPos = startBit + i;
-      const logicalByteIdx = Math.floor(bitPos / 8);
-      const byteIdx = data.length - 1 - logicalByteIdx;
-      const bitIdx = bitPos % 8;
-      if (byteIdx >= 0 && byteIdx < data.length) {
-        const bit = (data[byteIdx] >> bitIdx) & 1;
-        rawValue |= bit << i;
-      }
-    }
-  } else {
-    // Big endian
-    for (let i = 0; i < bitLength; i++) {
-      const bitPos = startBit + i;
-      const logicalByteIdx = Math.floor(bitPos / 8);
-      const byteIdx = data.length - 1 - logicalByteIdx;
-      const bitIdx = bitPos % 8;
-      if (byteIdx >= 0 && byteIdx < data.length) {
-        const bit = (data[byteIdx] >> bitIdx) & 1;
-        rawValue |= bit << (bitLength - 1 - i);
-      }
+  for (let i = 0; i < locations.length; i++) {
+    const { logicalByteIdx, bitIdx } = locations[i];
+    const byteIdx = data.length - 1 - logicalByteIdx;
+    if (byteIdx >= 0 && byteIdx < data.length) {
+      const bit = (data[byteIdx] >> bitIdx) & 1;
+      const shift = endianness === 'little' ? i : bitLength - 1 - i;
+      rawValue |= bit << shift;
     }
   }
 

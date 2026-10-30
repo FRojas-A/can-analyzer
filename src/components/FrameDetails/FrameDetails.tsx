@@ -1,4 +1,5 @@
 import type { CANMessage, SignalConfig } from "@/types/types"
+import { getSignalBitPositions } from "@/lib/can-utils"
 import { ChevronDown, ChevronRight, Circle, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
 import Button from "../ui/button"
@@ -34,8 +35,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
     const claimedBits = useMemo(() => {
         const bits = new Set<number>()
         for (const signal of signals) {
-            const end = signal.startBit + signal.bitLength - 1
-            for (let bit = signal.startBit; bit <= end; bit++) {
+            for (const bit of getSignalBitPositions(signal.startBit, signal.bitLength, signal.endianness)) {
                 bits.add(bit)
             }
         }
@@ -51,12 +51,12 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
         if (selectionStart === null || selectionEnd === null) {
             return false
         }
-        return signals.some((signal) => {
-            const signalStart = signal.startBit
-            const signalEnd = signal.startBit + signal.bitLength - 1
-            return Math.max(selectionStart, signalStart) <= Math.min(selectionEnd, signalEnd)
-        })
-    }, [selectionEnd, selectionStart, signals])
+        const selection = new Set(selectedBits)
+        return signals.some((signal) =>
+            getSignalBitPositions(signal.startBit, signal.bitLength, signal.endianness)
+                .some((bit) => selection.has(bit))
+        )
+    }, [selectedBits, selectionEnd, selectionStart, signals])
 
     const updateSignalsForCurrentFrame = (updater: (current: SignalConfig[]) => SignalConfig[]) => {
         onUpdateSignals(updater)
@@ -84,7 +84,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
 
         const newSignal: SignalConfig = {
             name: `Signal_${signalNumber}`,
-            startBit: selectionStart,
+            startBit: selectionEnd ?? selectionStart,
             bitLength: selectionLength,
             endianness: "big",
             scale: 1,

@@ -131,7 +131,7 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                                 className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
                                 placeholder="e.g. (raw * 0.1) - 40"
                             />
-                            <span className="text-[11px] text-muted-foreground/90">Start bit indexing is right-to-left in the byte expander. Decoded raw uses selected endianness first. If transform is empty/invalid, value = raw * scale + offset.</span>
+                            <span className="text-[11px] text-muted-foreground/90">Start bit indexing is right-to-left in the byte expander. Big endian: start bit is the signal's MSB (leftmost). Little endian: start bit is the LSB. If transform is empty/invalid, value = raw * scale + offset.</span>
                         </label>
                     </div>
                 )
