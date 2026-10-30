@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { compareCanIds } from "@/lib/can-utils"
 import type { CANMessage, SignalConfig } from "@/types/types"
 
+export type SelectionActionMode = "hide" | "show"
+
 interface FrameUiStateProfile {
   hiddenIds: Set<string>
   frameColorById: Record<string, string>
   signalsByFrameId: Record<string, SignalConfig[]>
   toggleHideFrame: (frameId: string) => void
   hideFrames: (frameIds: string[]) => void
+  unhideFrames: (frameIds: string[]) => void
   assignFrameColor: (frameId: string) => void
 }
 
@@ -16,9 +19,9 @@ export const useFrameUiState = (
   messagesVersion: number,
   profile: FrameUiStateProfile,
 ) => {
-  const { hiddenIds, frameColorById, signalsByFrameId, toggleHideFrame, hideFrames, assignFrameColor } = profile
+  const { hiddenIds, frameColorById, signalsByFrameId, toggleHideFrame, hideFrames, unhideFrames, assignFrameColor } = profile
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [showHidden, setShowHidden] = useState(false)
 
   useEffect(() => {
@@ -34,25 +37,34 @@ export const useFrameUiState = (
   }, [])
 
   const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((current) => current !== id) : [...prev, id],
+    )
   }, [])
 
-  const hideSelectedFrames = useCallback(() => {
-    if (selectedIds.size === 0) {
+  const selectedIdsSet = useMemo(() => new Set(selectedIds), [selectedIds])
+
+  const selectionMode: SelectionActionMode = useMemo(() => {
+    const anchor = selectedIds[0]
+    if (!anchor) {
+      return "hide"
+    }
+    return hiddenIds.has(anchor) ? "show" : "hide"
+  }, [hiddenIds, selectedIds])
+
+  const toggleSelectedVisibility = useCallback(() => {
+    if (selectedIds.length === 0) {
       return
     }
 
-    hideFrames(Array.from(selectedIds))
-    setSelectedIds(new Set())
-  }, [hideFrames, selectedIds])
+    const anchor = selectedIds[0]
+    if (hiddenIds.has(anchor)) {
+      unhideFrames(selectedIds)
+    } else {
+      hideFrames(selectedIds)
+    }
+    setSelectedIds([])
+  }, [hideFrames, hiddenIds, selectedIds, unhideFrames])
 
   const toggleHideFrameSelection = useCallback(
     (id: string) => {
@@ -61,15 +73,7 @@ export const useFrameUiState = (
       toggleHideFrame(id)
 
       if (willHide) {
-        setSelectedIds((prev) => {
-          if (!prev.has(id)) {
-            return prev
-          }
-
-          const next = new Set(prev)
-          next.delete(id)
-          return next
-        })
+        setSelectedIds((prev) => prev.filter((current) => current !== id))
       }
     },
     [hiddenIds, toggleHideFrame],
@@ -103,7 +107,7 @@ export const useFrameUiState = (
   const selectedFrames = useMemo(() => {
     void messagesVersion
 
-    return Array.from(selectedIds)
+    return selectedIds
       .map((id) => messages.get(id))
       .filter((frame): frame is CANMessage => Boolean(frame))
       .filter((frame) => showHidden || !hiddenIds.has(frame.id))
@@ -112,13 +116,15 @@ export const useFrameUiState = (
 
   return {
     selectedIds,
+    selectedIdsSet,
+    selectionMode,
     showHidden,
     selectedFrames,
     visibleCount,
     selectedSignalCount,
     toggleShowHidden,
     toggleSelect,
-    hideSelectedFrames,
+    toggleSelectedVisibility,
     toggleHideFrame: toggleHideFrameSelection,
   }
 }

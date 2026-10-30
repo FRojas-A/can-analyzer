@@ -1,22 +1,16 @@
-import { Activity, Circle, Download, Eye, Radio, Upload } from "lucide-react";
+import { Activity, Circle, Download, Radio, Upload } from "lucide-react";
 import { useRef } from "react";
 import Button from "../ui/button";
 import type { ConnectionStatus } from "@/types/types";
 
 interface TopNavProps {
     connectionStatus: ConnectionStatus
-    hiddenCount: number
-    showHidden: boolean
-    onToggleShowHidden: () => void
     onExportProfile: () => void
     onImportProfile: (file: File) => void
 }
 
 export default function TopNav({
     connectionStatus,
-    hiddenCount,
-    showHidden,
-    onToggleShowHidden,
     onExportProfile,
     onImportProfile,
 }: TopNavProps) {
@@ -71,14 +65,6 @@ export default function TopNav({
                 </Button>
                 <Button variant="ghost" size="sm" className="text-xs">
                     <Radio size={12} className="mr-1" /> Pause
-                </Button>
-                <Button
-                    variant={showHidden ? "secondary" : "ghost"}
-                    size="sm"
-                    className="text-xs"
-                    onClick={onToggleShowHidden}
-                >
-                    <Eye size={12} className="mr-1" /> {showHidden ? "Hide Hidden" : `Show Hidden${hiddenCount > 0 ? ` (${hiddenCount})` : ""}`}
                 </Button>
             </div>
         </header>

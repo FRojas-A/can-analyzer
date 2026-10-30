@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from "lucide-react"
 import FrameDetails from "./components/FrameDetails/FrameDetails"
 import LiveTable from "./components/LiveTable/LiveTable"
 import TopNav from "./components/TopNav/TopNav"
@@ -15,13 +16,15 @@ function App() {
 
   const {
     selectedIds,
+    selectedIdsSet,
+    selectionMode,
     showHidden,
     selectedFrames,
     visibleCount,
     selectedSignalCount,
     toggleShowHidden,
     toggleSelect,
-    hideSelectedFrames,
+    toggleSelectedVisibility,
     toggleHideFrame,
   } = useFrameUiState(messages, messagesVersion, {
     hiddenIds: vehicleProfile.hiddenIds,
@@ -29,6 +32,7 @@ function App() {
     signalsByFrameId: vehicleProfile.signalsByFrameId,
     toggleHideFrame: vehicleProfile.toggleHideFrame,
     hideFrames: vehicleProfile.hideFrames,
+    unhideFrames: vehicleProfile.unhideFrames,
     assignFrameColor: vehicleProfile.assignFrameColor,
   })
 
@@ -44,9 +48,6 @@ function App() {
     <div className="grid h-screen grid-rows-[auto_2fr_1fr] grid-cols-1 lg:grid-cols-[2fr_1fr]">
       <TopNav
         connectionStatus={connectionStatus}
-        hiddenCount={vehicleProfile.hiddenIds.size}
-        showHidden={showHidden}
-        onToggleShowHidden={toggleShowHidden}
         onExportProfile={vehicleProfile.exportProfile}
         onImportProfile={vehicleProfile.importProfile}
       />
@@ -54,19 +55,45 @@ function App() {
       <section className="col-span-1 overflow-hidden border-r border-border flex flex-col">
         <div className="flex items-center justify-between px-3 py-1 border-b border-border text-xs">
           <span className="text-muted-foreground py-3">
-            Frames: {visibleCount}/{messages.size} · Hidden: {vehicleProfile.hiddenIds.size} · Selected: {selectedIds.size} · Signals: {selectedSignalCount}
+            Frames: {visibleCount}/{messages.size} · Hidden: {vehicleProfile.hiddenIds.size} · Selected: {selectedIds.length} · Signals: {selectedSignalCount}
           </span>
-          {selectedIds.size > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={hideSelectedFrames}
-            >
-              Hide Selected ({selectedIds.size})
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                variant={selectionMode === "show" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={toggleSelectedVisibility}
+              >
+                {selectionMode === "show" ? "Show Selected" : "Hide Selected"} ({selectedIds.length})
+              </Button>
+            )}
+            {vehicleProfile.hiddenIds.size > 0 && (
+              <>
+                <Button
+                  type="button"
+                  variant={showHidden ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={toggleShowHidden}
+                >
+                  <Eye size={12} className="mr-1" />
+                  {showHidden ? "Hide Hidden" : "Show Hidden"} ({vehicleProfile.hiddenIds.size})
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={vehicleProfile.unhideAllFrames}
+                >
+                  <EyeOff size={12} className="mr-1" />
+                  Unhide All ({vehicleProfile.hiddenIds.size})
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         {connectionError && <div className="px-3 py-1 text-xs text-destructive border-b border-border">{connectionError}</div>}
         {vehicleProfile.storageError && <div className="px-3 py-1 text-xs text-destructive border-b border-border">{vehicleProfile.storageError}</div>}
@@ -74,7 +101,7 @@ function App() {
         <LiveTable
           messages={messages}
           messagesVersion={messagesVersion}
-          selectedIds={selectedIds}
+          selectedIds={selectedIdsSet}
           hiddenIds={vehicleProfile.hiddenIds}
           showHidden={showHidden}
           frameColors={vehicleProfile.frameColorById}

@@ -123,6 +123,23 @@ export const useVehicleProfile = () => {
     })
   }, [])
 
+  const unhideFrames = useCallback((frameIds: string[]) => {
+    setProfile((prev) => {
+      if (!prev) {
+        return prev
+      }
+      const hidden = new Set(prev.hiddenIds)
+      for (const frameId of frameIds) {
+        hidden.delete(frameId)
+      }
+      return { ...prev, hiddenIds: Array.from(hidden) }
+    })
+  }, [])
+
+  const unhideAllFrames = useCallback(() => {
+    setProfile((prev) => (prev ? { ...prev, hiddenIds: [] } : prev))
+  }, [])
+
   const hiddenIdsSet = useMemo(() => new Set(profile?.hiddenIds ?? []), [profile?.hiddenIds])
 
   const exportProfile = useCallback(() => {
@@ -169,6 +186,8 @@ export const useVehicleProfile = () => {
     setFrameColor,
     toggleHideFrame,
     hideFrames,
+    unhideFrames,
+    unhideAllFrames,
     exportProfile,
     importProfile,
   }
