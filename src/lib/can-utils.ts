@@ -69,7 +69,7 @@ export const getSignalBitPositions = (
   );
 
 export function extractSignalValue(
-  data: number[],
+  data: number[] | Uint8Array,
   startBit: number,
   bitLength: number,
   endianness: Endianness,

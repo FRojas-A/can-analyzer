@@ -96,13 +96,13 @@ export const useFrameUiState = (
     return count
   }, [hiddenIds, messages, messagesVersion, showHidden])
 
-  const selectedSignalCount = useMemo(() => {
+  const signalCount = useMemo(() => {
     let total = 0
-    for (const id of selectedIds) {
-      total += signalsByFrameId[id]?.length ?? 0
+    for (const signals of Object.values(signalsByFrameId)) {
+      total += signals.length
     }
     return total
-  }, [selectedIds, signalsByFrameId])
+  }, [signalsByFrameId])
 
   const selectedFrames = useMemo(() => {
     void messagesVersion
@@ -121,7 +121,7 @@ export const useFrameUiState = (
     showHidden,
     selectedFrames,
     visibleCount,
-    selectedSignalCount,
+    signalCount,
     toggleShowHidden,
     toggleSelect,
     toggleSelectedVisibility,

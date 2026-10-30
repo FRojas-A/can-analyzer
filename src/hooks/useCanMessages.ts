@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
-import { TEST_CAN_MESSAGES } from "@/lib/test-data"
+import { FrameCaptureBuffer } from "@/lib/capture"
+import { TEST_CAN_MESSAGES, seedTestCapture } from "@/lib/test-data"
 import type {
   CANMessage,
   ConnectionStatus,
@@ -11,6 +12,9 @@ import type {
 
 const DEFAULT_WS_URL = "ws://localhost:8080"
 const TEST_MODE_FLAGS = new Set(["1", "true", "yes", "on"])
+const CAPTURE_MAX_MS = 120_000
+const CAPTURE_MAX_FRAMES = 500_000
+const CAPTURE_VERSION_INTERVAL_MS = 250
 
 type UseCanMessagesOptions = {
   wsUrl?: string
@@ -106,6 +110,9 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   const [messagesVersion, bumpMessagesVersion] = useReducer((version: number) => version + 1, 0)
   const [liveConnectionStatus, setLiveConnectionStatus] = useState<ConnectionStatus>("CONNECTING")
   const [liveConnectionError, setLiveConnectionError] = useState<string | null>(null)
+  const [captureVersion, setCaptureVersion] = useState(0)
+  const [capture] = useState(() => new FrameCaptureBuffer())
+  const captureDirtyRef = useRef(false)
   const dirtyRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
 
@@ -148,7 +155,7 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     [markDirty],
   )
 
-  const applyFrames = useCallback((frames: WsFrameEvent[], hits = 1) => {
+  const applyFrames = useCallback((frames: WsFrameEvent[], hits = 1, record = false) => {
     if (!frames.length) {
       return
     }
@@ -156,9 +163,42 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     const messages = messagesRef.current
     for (const frame of frames) {
       applyFrameEvent(messages, frame, frame.hits ?? hits)
+
+      if (record) {
+        const bytes = hexToBytes(frame.data)
+        if (bytes.length > 0) {
+          capture.append({
+            ts: Number(frame.ts) || Date.now(),
+            id: toCanId(frame.id),
+            data: Uint8Array.from(bytes),
+          })
+        }
+      }
     }
+
+    if (record) {
+      capture.trim(CAPTURE_MAX_MS, CAPTURE_MAX_FRAMES)
+      captureDirtyRef.current = true
+    }
+
     markDirty()
-  }, [markDirty])
+  }, [capture, markDirty])
+
+  const clearCapture = useCallback(() => {
+    capture.clear()
+    captureDirtyRef.current = true
+    setCaptureVersion((current) => current + 1)
+  }, [capture])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (captureDirtyRef.current) {
+        captureDirtyRef.current = false
+        setCaptureVersion((current) => current + 1)
+      }
+    }, CAPTURE_VERSION_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -172,6 +212,8 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
   useEffect(() => {
     if (useTestData) {
       replaceMessages(createSeededMessages())
+      seedTestCapture(capture)
+      captureDirtyRef.current = true
       return
     }
 
@@ -205,14 +247,14 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
 
       const packet = parsed as { type: string }
       if (packet.type === "frame") {
-        applyFrames([parsed as WsFrameEvent])
+        applyFrames([parsed as WsFrameEvent], 1, true)
         return
       }
 
       if (packet.type === "frameBatch") {
         const batch = parsed as WsFrameBatchEvent
         if (Array.isArray(batch.frames)) {
-          applyFrames(batch.frames)
+          applyFrames(batch.frames, 1, true)
         }
         return
       }
@@ -244,12 +286,15 @@ export const useCanMessages = (options: UseCanMessagesOptions = {}) => {
     return () => {
       ws.close()
     }
-  }, [applyFrames, replaceMessages, useTestData, wsUrl])
+  }, [applyFrames, capture, replaceMessages, useTestData, wsUrl])
 
   return {
     messages,
     messagesVersion,
     connectionStatus,
     connectionError,
+    capture,
+    captureVersion,
+    clearCapture,
   }
 }

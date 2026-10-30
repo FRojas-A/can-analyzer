@@ -1,17 +1,21 @@
+import { useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
+import { compareCanIds } from "./lib/can-utils"
 import FrameDetails from "./components/FrameDetails/FrameDetails"
 import LiveTable from "./components/LiveTable/LiveTable"
+import SignalChart from "./components/SignalChart/SignalChart"
 import TopNav from "./components/TopNav/TopNav"
 import Button from "./components/ui/button"
 import Card from "./components/ui/card"
 import { useCanMessages } from "./hooks/useCanMessages"
 import { useFrameUiState } from "./hooks/useFrameUiState"
 import { useVehicleProfile } from "./hooks/useVehicleProfile"
+import type { ChartSignal } from "./types/types"
 
 const FALLBACK_FRAME_COLOR = "#4FA6F8"
 
 function App() {
-  const { messages, messagesVersion, connectionStatus, connectionError } = useCanMessages()
+  const { messages, messagesVersion, connectionStatus, connectionError, capture, captureVersion, clearCapture } = useCanMessages()
   const vehicleProfile = useVehicleProfile()
 
   const {
@@ -21,7 +25,7 @@ function App() {
     showHidden,
     selectedFrames,
     visibleCount,
-    selectedSignalCount,
+    signalCount,
     toggleShowHidden,
     toggleSelect,
     toggleSelectedVisibility,
@@ -35,6 +39,31 @@ function App() {
     unhideFrames: vehicleProfile.unhideFrames,
     assignFrameColor: vehicleProfile.assignFrameColor,
   })
+
+  const chartSignals: ChartSignal[] = useMemo(() => {
+    void messagesVersion
+    const list: ChartSignal[] = []
+    const frameIds = Array.from(messages.keys()).sort(compareCanIds)
+    for (const frameId of frameIds) {
+      const signals = vehicleProfile.signalsByFrameId[frameId] ?? []
+      const frameColor = vehicleProfile.frameColorById[frameId] ?? FALLBACK_FRAME_COLOR
+      signals.forEach((signal, index) => {
+        list.push({
+          key: `${frameId}:${index}:${signal.name}`,
+          frameId,
+          name: signal.name,
+          color: signal.color ?? frameColor,
+          startBit: signal.startBit,
+          bitLength: signal.bitLength,
+          endianness: signal.endianness,
+          scale: signal.scale,
+          offset: signal.offset,
+          transform: signal.transform,
+        })
+      })
+    }
+    return list
+  }, [messages, messagesVersion, vehicleProfile.frameColorById, vehicleProfile.signalsByFrameId])
 
   if (!vehicleProfile.hydrated) {
     return (
@@ -55,7 +84,7 @@ function App() {
       <section className="col-span-1 overflow-hidden border-r border-border flex flex-col">
         <div className="flex items-center justify-between px-3 py-1 border-b border-border text-xs">
           <span className="text-muted-foreground py-3">
-            Frames: {visibleCount}/{messages.size} · Hidden: {vehicleProfile.hiddenIds.size} · Selected: {selectedIds.length} · Signals: {selectedSignalCount}
+            Frames: {visibleCount}/{messages.size} · Hidden: {vehicleProfile.hiddenIds.size} · Selected: {selectedIds.length} · Signals: {signalCount}
           </span>
           <div className="flex items-center gap-1">
             {selectedIds.length > 0 && (
@@ -129,8 +158,13 @@ function App() {
         )}
       </aside>
 
-      <section className="col-span-2 overflow-y-auto p-2 border-t border-border">
-        <div className="p-4 text-sm text-muted-foreground">Signal analysis coming soon...</div>
+      <section className="col-span-2 overflow-hidden border-t border-border">
+        <SignalChart
+          signals={chartSignals}
+          capture={capture}
+          captureVersion={captureVersion}
+          onClearCapture={clearCapture}
+        />
       </section>
     </div>
   )

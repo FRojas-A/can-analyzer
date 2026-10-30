@@ -1,4 +1,5 @@
 import type { CANMessage } from "@/types/types"
+import type { FrameCaptureBuffer } from "@/lib/capture"
 
 type WsFrameFixture = {
   type: "frame"
@@ -152,4 +153,23 @@ export const TEST_CAN_MESSAGES: CANMessage[] = [
 
 export function createTestMessageMap(): Map<string, CANMessage> {
   return new Map(TEST_CAN_MESSAGES.map((message) => [message.id, message]))
+}
+
+export function seedTestCapture(capture: FrameCaptureBuffer): void {
+  const endTs = baseTs
+  const spanMs = 60_000
+
+  for (const message of TEST_CAN_MESSAGES) {
+    const rate = Math.max(1, message.rate)
+    const periodMs = 1000 / rate
+    for (let t = endTs - spanMs; t <= endTs; t += periodMs) {
+      const phase = (t / 1000) * 2
+      const data = new Uint8Array(8)
+      for (let b = 0; b < 8; b++) {
+        const value = Math.round(128 + 110 * Math.sin(phase + b * 0.9) + 20 * Math.sin(phase * 0.13 + b))
+        data[b] = Math.max(0, Math.min(255, value))
+      }
+      capture.append({ ts: t, id: message.id, data })
+    }
+  }
 }
