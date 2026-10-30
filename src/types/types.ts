@@ -30,6 +30,16 @@ export interface SelectedMessage {
   color: string;
 }
 
+export interface VehicleProfile {
+  id: string;
+  name: string;
+  signalsByFrameId: Record<string, SignalConfig[]>;
+  frameColorById: Record<string, string>;
+  hiddenIds: string[];
+  nextFrameColorIndex: number;
+  updatedAt: number;
+}
+
 export interface RecordedFrame {
   id: string;
   data: number[];

@@ -1,6 +1,6 @@
 import type { CANMessage, SignalConfig } from "@/types/types"
 import { ChevronDown, ChevronRight, Circle, Plus } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import Button from "../ui/button"
 import Card from "../ui/card"
 import ByteExpander from "./ByteExpander"
@@ -9,22 +9,27 @@ import Signals from "./Signals"
 interface FrameDetailsProps {
     frame: CANMessage
     frameColor: string
+    signals: SignalConfig[]
+    onUpdateSignals: (updater: (current: SignalConfig[]) => SignalConfig[]) => void
     onFrameColorChange?: (frameId: string, color: string) => void
-    onSignalCountChange?: (frameId: string, signalCount: number) => void
 }
 
-const FrameDetails = ({ frame, frameColor, onFrameColorChange, onSignalCountChange }: FrameDetailsProps) => {
+const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColorChange }: FrameDetailsProps) => {
     const [isCardOpen, setIsCardOpen] = useState(true)
     const [isByteSectionOpen, setIsByteSectionOpen] = useState(true)
     const [isSignalSectionOpen, setIsSignalSectionOpen] = useState(true)
     const [expandedByte, setExpandedByte] = useState<number | null>(null)
     const [selectedBits, setSelectedBits] = useState<number[]>([])
-    const [signalsByFrameId, setSignalsByFrameId] = useState<Record<string, SignalConfig[]>>({})
+    const [activeFrameId, setActiveFrameId] = useState(frame.id)
+
+    if (activeFrameId !== frame.id) {
+        setActiveFrameId(frame.id)
+        setExpandedByte(null)
+        setSelectedBits([])
+    }
 
     const byteCount = Math.max(8, frame.dlc, frame.data.length)
     const displayData = Array.from({ length: byteCount }, (_, i) => frame.data[i] ?? 0)
-
-    const signals = signalsByFrameId[frame.id] ?? []
 
     const claimedBits = useMemo(() => {
         const bits = new Set<number>()
@@ -53,23 +58,8 @@ const FrameDetails = ({ frame, frameColor, onFrameColorChange, onSignalCountChan
         })
     }, [selectionEnd, selectionStart, signals])
 
-    useEffect(() => {
-        setExpandedByte(null)
-        setSelectedBits([])
-    }, [frame.id])
-
-    useEffect(() => {
-        onSignalCountChange?.(frame.id, signals.length)
-    }, [frame.id, onSignalCountChange, signals.length])
-
     const updateSignalsForCurrentFrame = (updater: (current: SignalConfig[]) => SignalConfig[]) => {
-        setSignalsByFrameId((prev) => {
-            const current = prev[frame.id] ?? []
-            return {
-                ...prev,
-                [frame.id]: updater(current),
-            }
-        })
+        onUpdateSignals(updater)
     }
 
     const toggleBit = (bitIndex: number) => {

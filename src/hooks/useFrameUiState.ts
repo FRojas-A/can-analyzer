@@ -1,33 +1,33 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { compareCanIds, generateStableColor } from "@/lib/can-utils"
-import type { CANMessage } from "@/types/types"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { compareCanIds } from "@/lib/can-utils"
+import type { CANMessage, SignalConfig } from "@/types/types"
 
-export const useFrameUiState = (messages: Map<string, CANMessage>, messagesVersion: number) => {
+interface FrameUiStateProfile {
+  hiddenIds: Set<string>
+  frameColorById: Record<string, string>
+  signalsByFrameId: Record<string, SignalConfig[]>
+  toggleHideFrame: (frameId: string) => void
+  hideFrames: (frameIds: string[]) => void
+  assignFrameColor: (frameId: string) => void
+}
+
+export const useFrameUiState = (
+  messages: Map<string, CANMessage>,
+  messagesVersion: number,
+  profile: FrameUiStateProfile,
+) => {
+  const { hiddenIds, frameColorById, signalsByFrameId, toggleHideFrame, hideFrames, assignFrameColor } = profile
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
-  const [signalCountByFrameId, setSignalCountByFrameId] = useState<Record<string, number>>({})
-  const [frameColorById, setFrameColorById] = useState<Record<string, string>>({})
-  const nextFrameColorIndexRef = useRef(0)
 
   useEffect(() => {
-    setFrameColorById((prev) => {
-      let next: Record<string, string> | null = null
-
-      for (const id of messages.keys()) {
-        if (!prev[id]) {
-          if (!next) {
-            next = { ...prev }
-          }
-
-          next[id] = generateStableColor("frame", nextFrameColorIndexRef.current)
-          nextFrameColorIndexRef.current += 1
-        }
+    for (const id of messages.keys()) {
+      if (!frameColorById[id]) {
+        assignFrameColor(id)
       }
-
-      return next ?? prev
-    })
-  }, [messages, messagesVersion])
+    }
+  }, [assignFrameColor, frameColorById, messages, messagesVersion])
 
   const toggleShowHidden = useCallback(() => {
     setShowHidden((current) => !current)
@@ -50,41 +50,30 @@ export const useFrameUiState = (messages: Map<string, CANMessage>, messagesVersi
       return
     }
 
-    setHiddenIds((prev) => {
-      const next = new Set(prev)
-      for (const id of selectedIds) {
-        next.add(id)
-      }
-      return next
-    })
+    hideFrames(Array.from(selectedIds))
     setSelectedIds(new Set())
-  }, [selectedIds])
+  }, [hideFrames, selectedIds])
 
-  const toggleHideFrame = useCallback((id: string) => {
-    const willHide = !hiddenIds.has(id)
+  const toggleHideFrameSelection = useCallback(
+    (id: string) => {
+      const willHide = !hiddenIds.has(id)
 
-    setHiddenIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
+      toggleHideFrame(id)
+
+      if (willHide) {
+        setSelectedIds((prev) => {
+          if (!prev.has(id)) {
+            return prev
+          }
+
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
       }
-      return next
-    })
-
-    if (willHide) {
-      setSelectedIds((prev) => {
-        if (!prev.has(id)) {
-          return prev
-        }
-
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    }
-  }, [hiddenIds])
+    },
+    [hiddenIds, toggleHideFrame],
+  )
 
   const visibleCount = useMemo(() => {
     void messagesVersion
@@ -106,34 +95,10 @@ export const useFrameUiState = (messages: Map<string, CANMessage>, messagesVersi
   const selectedSignalCount = useMemo(() => {
     let total = 0
     for (const id of selectedIds) {
-      total += signalCountByFrameId[id] ?? 0
+      total += signalsByFrameId[id]?.length ?? 0
     }
     return total
-  }, [selectedIds, signalCountByFrameId])
-
-  const handleSignalCountChange = useCallback((frameId: string, signalCount: number) => {
-    setSignalCountByFrameId((prev) => {
-      if (prev[frameId] === signalCount) {
-        return prev
-      }
-      return {
-        ...prev,
-        [frameId]: signalCount,
-      }
-    })
-  }, [])
-
-  const handleFrameColorChange = useCallback((frameId: string, color: string) => {
-    setFrameColorById((prev) => {
-      if (prev[frameId] === color) {
-        return prev
-      }
-      return {
-        ...prev,
-        [frameId]: color,
-      }
-    })
-  }, [])
+  }, [selectedIds, signalsByFrameId])
 
   const selectedFrames = useMemo(() => {
     void messagesVersion
@@ -147,17 +112,13 @@ export const useFrameUiState = (messages: Map<string, CANMessage>, messagesVersi
 
   return {
     selectedIds,
-    hiddenIds,
     showHidden,
     selectedFrames,
     visibleCount,
     selectedSignalCount,
-    frameColorById,
     toggleShowHidden,
     toggleSelect,
     hideSelectedFrames,
-    toggleHideFrame,
-    handleSignalCountChange,
-    handleFrameColorChange,
+    toggleHideFrame: toggleHideFrameSelection,
   }
 }

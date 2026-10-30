@@ -1,4 +1,5 @@
-import { Activity, Circle, Eye, Radio } from "lucide-react";
+import { Activity, Circle, Download, Eye, Radio, Upload } from "lucide-react";
+import { useRef } from "react";
 import Button from "../ui/button";
 import type { ConnectionStatus } from "@/types/types";
 
@@ -7,6 +8,8 @@ interface TopNavProps {
     hiddenCount: number
     showHidden: boolean
     onToggleShowHidden: () => void
+    onExportProfile: () => void
+    onImportProfile: (file: File) => void
 }
 
 export default function TopNav({
@@ -14,7 +17,11 @@ export default function TopNav({
     hiddenCount,
     showHidden,
     onToggleShowHidden,
+    onExportProfile,
+    onImportProfile,
 }: TopNavProps) {
+    const importInputRef = useRef<HTMLInputElement>(null)
+
     return (
         <header className="col-span-1 lg:col-span-2 border-b flex justify-between items-center p-2">
             <div className="flex gap-4">
@@ -28,6 +35,37 @@ export default function TopNav({
                 </div>
             </div>
             <div className="flex gap-2">
+                <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                            onImportProfile(file)
+                        }
+                        e.target.value = ""
+                    }}
+                />
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={onExportProfile}
+                    title="Export profile"
+                >
+                    <Download size={12} className="mr-1" /> Export
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => importInputRef.current?.click()}
+                    title="Import profile"
+                >
+                    <Upload size={12} className="mr-1" /> Import
+                </Button>
                 <Button variant="outline" size="sm" className="text-xs border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
                     <Circle size={12} className="mr-1 fill-current" /> Record
                 </Button>
