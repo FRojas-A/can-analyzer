@@ -52,9 +52,8 @@ function App() {
   })
 
   const chartSignals: ChartSignal[] = useMemo(() => {
-    void messagesVersion
     const list: ChartSignal[] = []
-    const frameIds = Array.from(messages.keys()).sort(compareCanIds)
+    const frameIds = Object.keys(vehicleProfile.signalsByFrameId).sort(compareCanIds)
     for (const frameId of frameIds) {
       const signals = vehicleProfile.signalsByFrameId[frameId] ?? []
       const frameColor = vehicleProfile.frameColorById[frameId] ?? FALLBACK_FRAME_COLOR
@@ -74,7 +73,7 @@ function App() {
       })
     }
     return list
-  }, [messages, messagesVersion, vehicleProfile.frameColorById, vehicleProfile.signalsByFrameId])
+  }, [vehicleProfile.frameColorById, vehicleProfile.signalsByFrameId])
 
   const { unhideFrames } = vehicleProfile
 
