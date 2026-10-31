@@ -1,6 +1,5 @@
 import type { CANMessage, SignalConfig } from "@/types/types"
 import { generateSignalColor, getSignalBitPositions } from "@/lib/can-utils"
-import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronRight, Circle, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
 import Button from "../ui/button"
@@ -17,11 +16,10 @@ interface FrameDetailsProps {
     signalFocus?: { key: string; nonce: number } | null
 }
 
-type FrameTab = "bytes" | "signals"
-
 const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColorChange, signalFocus }: FrameDetailsProps) => {
     const [isCardOpen, setIsCardOpen] = useState(true)
-    const [activeTab, setActiveTab] = useState<FrameTab>("bytes")
+    const [isByteSectionOpen, setIsByteSectionOpen] = useState(true)
+    const [isSignalSectionOpen, setIsSignalSectionOpen] = useState(true)
     const [expandedByte, setExpandedByte] = useState<number | null>(null)
     const [selectedBits, setSelectedBits] = useState<number[]>([])
     const [activeFrameId, setActiveFrameId] = useState(frame.id)
@@ -36,7 +34,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
     if (signalFocus && signalFocus.nonce !== focusNonce) {
         setFocusNonce(signalFocus.nonce)
         setIsCardOpen(true)
-        setActiveTab("signals")
+        setIsSignalSectionOpen(true)
     }
 
     const byteCount = Math.max(8, frame.dlc, frame.data.length)
@@ -151,71 +149,75 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
             </div>
             {isCardOpen && (
                 <>
-                    <div className="flex border-b border-border px-2">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab("bytes")}
-                            className={cn(
-                                "-mb-px cursor-pointer border-b-2 px-2 py-1.5 text-xs font-medium",
-                                activeTab === "bytes"
-                                    ? "border-primary text-foreground"
-                                    : "border-transparent text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Bytes
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab("signals")}
-                            className={cn(
-                                "-mb-px cursor-pointer border-b-2 px-2 py-1.5 text-xs font-medium",
-                                activeTab === "signals"
-                                    ? "border-primary text-foreground"
-                                    : "border-transparent text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Signals{signals.length > 0 ? ` (${signals.length})` : ""}
-                        </button>
+                    <div className="border-b">
+                        <div className="flex items-center justify-between py-2 px-4">
+                            <label className="text-xs text-muted-foreground">Byte expander</label>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2"
+                                onClick={() => setIsByteSectionOpen((current) => !current)}
+                            >
+                                {isByteSectionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </Button>
+                        </div>
+                        {isByteSectionOpen && (
+                            <div className="flex flex-col justify-center items-start py-2 px-4 gap-1">
+                                <ByteExpander
+                                    data={displayData}
+                                    expandedByte={expandedByte}
+                                    onToggleByte={(byteIndex) => setExpandedByte((current) => (current === byteIndex ? null : byteIndex))}
+                                    selectedBits={new Set(selectedBits)}
+                                    claimedBits={claimedBits}
+                                    onToggleBit={toggleBit}
+                                    onClearSelection={() => setSelectedBits([])}
+                                />
+                                {expandedByte !== null && <div className="w-full text-xs text-muted-foreground mt-2">
+                                    {selectionStart !== null && selectionEnd !== null ? (
+                                        <span>
+                                            Selected bits: {selectedBits.length} (range {selectionStart}-{selectionEnd}, length {selectionLength})
+                                        </span>
+                                    ) : (
+                                        <span>Select one or more bits to define a signal range.</span>
+                                    )}
+                                </div>}
+                                {hasSelectionOverlap && (
+                                    <div className="w-full rounded-md border border-accent/50 bg-accent/10 px-2 py-1 text-xs text-accent mt-1">
+                                        Warning: selected range overlaps an existing signal. You can still add it.
+                                    </div>
+                                )}
+                                {expandedByte !== null && <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2 bg-primary text-primary-foreground"
+                                    disabled={selectionLength === 0}
+                                    onClick={addSignalFromSelection}
+                                >
+                                    <Plus size={14} />
+                                    Add Signal
+                                </Button>}
+                            </div>
+                        )}
                     </div>
 
-                    {activeTab === "bytes" ? (
-                        <div className="flex flex-col justify-center items-start py-2 px-4 gap-1">
-                            <ByteExpander
-                                data={displayData}
-                                expandedByte={expandedByte}
-                                onToggleByte={(byteIndex) => setExpandedByte((current) => (current === byteIndex ? null : byteIndex))}
-                                selectedBits={new Set(selectedBits)}
-                                claimedBits={claimedBits}
-                                onToggleBit={toggleBit}
-                                onClearSelection={() => setSelectedBits([])}
-                            />
-                            {expandedByte !== null && <div className="w-full text-xs text-muted-foreground mt-2">
-                                {selectionStart !== null && selectionEnd !== null ? (
-                                    <span>
-                                        Selected bits: {selectedBits.length} (range {selectionStart}-{selectionEnd}, length {selectionLength})
-                                    </span>
-                                ) : (
-                                    <span>Select one or more bits to define a signal range.</span>
-                                )}
-                            </div>}
-                            {hasSelectionOverlap && (
-                                <div className="w-full rounded-md border border-accent/50 bg-accent/10 px-2 py-1 text-xs text-accent mt-1">
-                                    Warning: selected range overlaps an existing signal. You can still add it.
-                                </div>
-                            )}
-                            {expandedByte !== null && <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-2 bg-primary text-primary-foreground"
-                                disabled={selectionLength === 0}
-                                onClick={addSignalFromSelection}
-                            >
-                                <Plus size={14} />
-                                Add Signal
-                            </Button>}
+                    <div className="py-2 px-4">
+                        <div className="flex items-center justify-between pb-2">
+                            <label className="text-xs text-muted-foreground">Signals</label>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Total: {signals.length}</span>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2"
+                                    onClick={() => setIsSignalSectionOpen((current) => !current)}
+                                >
+                                    {isSignalSectionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                </Button>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="py-2 px-4">
+                        {isSignalSectionOpen && (
                             <Signals
                                 frameColor={frameColor}
                                 data={displayData}
@@ -225,8 +227,8 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
                                 onUpdateSignal={updateSignal}
                                 onRemoveSignal={removeSignal}
                             />
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </>
             )}
         </Card>

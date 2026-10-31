@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react"
 import { toNumber, cn } from "@/lib/utils"
 import { evaluateTransform, extractSignalValue } from "@/lib/can-utils"
 import type { Endianness, SignalConfig } from "@/types/types"
-import { X } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import Button from "../ui/button"
 
 interface SignalsProps {
@@ -82,7 +82,7 @@ const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUp
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 onClick={() => onRemoveSignal(index)}
                             >
-                                <X size={14} />
+                                <Trash2 size={14} />
                             </Button>
                         </div>
 
