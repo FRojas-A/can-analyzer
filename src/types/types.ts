@@ -11,6 +11,7 @@ export interface CANMessage {
 export type Endianness = 'big' | 'little';
 
 export interface SignalConfig {
+  id: string;
   name: string;
   startBit: number;
   bitLength: number;
@@ -38,6 +39,31 @@ export interface VehicleProfile {
   hiddenIds: string[];
   nextFrameColorIndex: number;
   updatedAt: number;
+}
+
+export interface CapturedFrame {
+  ts: number;
+  id: string;
+  data: Uint8Array;
+}
+
+export interface ChartSignal {
+  key: string;
+  frameId: string;
+  name: string;
+  color: string;
+  startBit: number;
+  bitLength: number;
+  endianness: Endianness;
+  scale: number;
+  offset: number;
+  transform?: string;
+}
+
+export interface SignalFocus {
+  frameId: string;
+  key: string;
+  nonce: number;
 }
 
 export interface RecordedFrame {

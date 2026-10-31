@@ -24,38 +24,68 @@ export function getChangedBits(current: number[], previous?: number[]): boolean[
   return bits;
 }
 
+interface BitLocation {
+  logicalByteIdx: number;
+  bitIdx: number;
+}
+
+const getSignalBitLocations = (
+  startBit: number,
+  bitLength: number,
+  endianness: Endianness
+): BitLocation[] => {
+  const locations: BitLocation[] = [];
+
+  for (let i = 0; i < bitLength; i++) {
+    if (endianness === 'little') {
+      const bitPos = startBit + i;
+      locations.push({ logicalByteIdx: Math.floor(bitPos / 8), bitIdx: bitPos % 8 });
+    } else {
+      const firstByteBits = (startBit % 8) + 1;
+      let logicalByteIdx: number;
+      let bitIdx: number;
+      if (i < firstByteBits) {
+        logicalByteIdx = Math.floor(startBit / 8);
+        bitIdx = (startBit % 8) - i;
+      } else {
+        const remaining = i - firstByteBits;
+        logicalByteIdx = Math.floor(startBit / 8) + 1 + Math.floor(remaining / 8);
+        bitIdx = 7 - (remaining % 8);
+      }
+      locations.push({ logicalByteIdx, bitIdx });
+    }
+  }
+
+  return locations;
+};
+
+export const getSignalBitPositions = (
+  startBit: number,
+  bitLength: number,
+  endianness: Endianness
+): number[] =>
+  getSignalBitLocations(startBit, bitLength, endianness).map(
+    ({ logicalByteIdx, bitIdx }) => logicalByteIdx * 8 + bitIdx
+  );
+
 export function extractSignalValue(
-  data: number[],
+  data: number[] | Uint8Array,
   startBit: number,
   bitLength: number,
   endianness: Endianness,
   scale: number = 1,
   offset: number = 0
 ): number {
+  const locations = getSignalBitLocations(startBit, bitLength, endianness);
   let rawValue = 0;
 
-  if (endianness === 'little') {
-    for (let i = 0; i < bitLength; i++) {
-      const bitPos = startBit + i;
-      const logicalByteIdx = Math.floor(bitPos / 8);
-      const byteIdx = data.length - 1 - logicalByteIdx;
-      const bitIdx = bitPos % 8;
-      if (byteIdx >= 0 && byteIdx < data.length) {
-        const bit = (data[byteIdx] >> bitIdx) & 1;
-        rawValue |= bit << i;
-      }
-    }
-  } else {
-    // Big endian
-    for (let i = 0; i < bitLength; i++) {
-      const bitPos = startBit + i;
-      const logicalByteIdx = Math.floor(bitPos / 8);
-      const byteIdx = data.length - 1 - logicalByteIdx;
-      const bitIdx = bitPos % 8;
-      if (byteIdx >= 0 && byteIdx < data.length) {
-        const bit = (data[byteIdx] >> bitIdx) & 1;
-        rawValue |= bit << (bitLength - 1 - i);
-      }
+  for (let i = 0; i < locations.length; i++) {
+    const { logicalByteIdx, bitIdx } = locations[i];
+    const byteIdx = data.length - 1 - logicalByteIdx;
+    if (byteIdx >= 0 && byteIdx < data.length) {
+      const bit = (data[byteIdx] >> bitIdx) & 1;
+      const shift = endianness === 'little' ? i : bitLength - 1 - i;
+      rawValue |= bit << shift;
     }
   }
 
@@ -156,6 +186,57 @@ export function generateStableColor(seed: string | number, offset: number = 0): 
   const hue = modulo(hashSeed(seed) + offset * GOLDEN_ANGLE, 360);
   return hslToHex(hue, 72, 58);
 }
+
+const hexToHsl = (hex: string): { h: number; s: number; l: number } | null => {
+  const normalized = hex.replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(normalized.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l: l * 100 };
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) {
+    h = (g - b) / d + (g < b ? 6 : 0);
+  } else if (max === g) {
+    h = (b - r) / d + 2;
+  } else {
+    h = (r - g) / d + 4;
+  }
+  h *= 60;
+
+  return { h, s: s * 100, l: l * 100 };
+};
+
+export const generateSignalColor = (frameColor: string, signalIndex: number): string => {
+  const hsl = hexToHsl(frameColor);
+  if (!hsl) {
+    return frameColor;
+  }
+  if (signalIndex <= 0) {
+    return frameColor;
+  }
+
+  const baseStep = Math.ceil(signalIndex / 2) * 12;
+  const step = signalIndex % 2 === 1 ? -baseStep : baseStep;
+  let lightness = Math.max(18, Math.min(85, hsl.l + step));
+  if (Math.abs(lightness - hsl.l) < 6) {
+    lightness = Math.max(18, Math.min(85, hsl.l - step));
+  }
+  return hslToHex(hsl.h, hsl.s, lightness);
+};
 
 export function formatTimestamp(ts: number): string {
   const d = new Date(ts);

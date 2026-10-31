@@ -1,4 +1,5 @@
 import type { CANMessage, SignalConfig } from "@/types/types"
+import { generateSignalColor, getSignalBitPositions } from "@/lib/can-utils"
 import { ChevronDown, ChevronRight, Circle, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
 import Button from "../ui/button"
@@ -12,20 +13,28 @@ interface FrameDetailsProps {
     signals: SignalConfig[]
     onUpdateSignals: (updater: (current: SignalConfig[]) => SignalConfig[]) => void
     onFrameColorChange?: (frameId: string, color: string) => void
+    signalFocus?: { key: string; nonce: number } | null
 }
 
-const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColorChange }: FrameDetailsProps) => {
+const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColorChange, signalFocus }: FrameDetailsProps) => {
     const [isCardOpen, setIsCardOpen] = useState(true)
     const [isByteSectionOpen, setIsByteSectionOpen] = useState(true)
     const [isSignalSectionOpen, setIsSignalSectionOpen] = useState(true)
     const [expandedByte, setExpandedByte] = useState<number | null>(null)
     const [selectedBits, setSelectedBits] = useState<number[]>([])
     const [activeFrameId, setActiveFrameId] = useState(frame.id)
+    const [focusNonce, setFocusNonce] = useState(0)
 
     if (activeFrameId !== frame.id) {
         setActiveFrameId(frame.id)
         setExpandedByte(null)
         setSelectedBits([])
+    }
+
+    if (signalFocus && signalFocus.nonce !== focusNonce) {
+        setFocusNonce(signalFocus.nonce)
+        setIsCardOpen(true)
+        setIsSignalSectionOpen(true)
     }
 
     const byteCount = Math.max(8, frame.dlc, frame.data.length)
@@ -34,8 +43,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
     const claimedBits = useMemo(() => {
         const bits = new Set<number>()
         for (const signal of signals) {
-            const end = signal.startBit + signal.bitLength - 1
-            for (let bit = signal.startBit; bit <= end; bit++) {
+            for (const bit of getSignalBitPositions(signal.startBit, signal.bitLength, signal.endianness)) {
                 bits.add(bit)
             }
         }
@@ -51,12 +59,12 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
         if (selectionStart === null || selectionEnd === null) {
             return false
         }
-        return signals.some((signal) => {
-            const signalStart = signal.startBit
-            const signalEnd = signal.startBit + signal.bitLength - 1
-            return Math.max(selectionStart, signalStart) <= Math.min(selectionEnd, signalEnd)
-        })
-    }, [selectionEnd, selectionStart, signals])
+        const selection = new Set(selectedBits)
+        return signals.some((signal) =>
+            getSignalBitPositions(signal.startBit, signal.bitLength, signal.endianness)
+                .some((bit) => selection.has(bit))
+        )
+    }, [selectedBits, selectionEnd, selectionStart, signals])
 
     const updateSignalsForCurrentFrame = (updater: (current: SignalConfig[]) => SignalConfig[]) => {
         onUpdateSignals(updater)
@@ -83,13 +91,15 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
         }
 
         const newSignal: SignalConfig = {
+            id: crypto.randomUUID(),
             name: `Signal_${signalNumber}`,
-            startBit: selectionStart,
+            startBit: selectionEnd ?? selectionStart,
             bitLength: selectionLength,
             endianness: "big",
             scale: 1,
             offset: 0,
             transform: "",
+            color: generateSignalColor(frameColor, signals.length),
         }
 
         updateSignalsForCurrentFrame((current) => [...current, newSignal])
@@ -139,7 +149,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
             </div>
             {isCardOpen && (
                 <>
-                    <div className={isCardOpen ? "border-b" : ""}>
+                    <div className="border-b">
                         <div className="flex items-center justify-between py-2 px-4">
                             <label className="text-xs text-muted-foreground">Byte expander</label>
                             <Button
@@ -212,6 +222,8 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
                                 frameColor={frameColor}
                                 data={displayData}
                                 signals={signals}
+                                highlightKey={signalFocus?.key ?? null}
+                                highlightNonce={signalFocus?.nonce ?? 0}
                                 onUpdateSignal={updateSignal}
                                 onRemoveSignal={removeSignal}
                             />

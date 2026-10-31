@@ -1,19 +1,30 @@
-import { toNumber } from "@/lib/utils"
+import { useEffect, useRef } from "react"
+import { toNumber, cn } from "@/lib/utils"
 import { evaluateTransform, extractSignalValue } from "@/lib/can-utils"
 import type { Endianness, SignalConfig } from "@/types/types"
-import { X } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import Button from "../ui/button"
 
 interface SignalsProps {
     frameColor: string
     data: number[]
     signals: SignalConfig[]
+    highlightKey?: string | null
+    highlightNonce?: number
     onUpdateSignal: (signalIndex: number, nextSignal: SignalConfig) => void
     onRemoveSignal: (signalIndex: number) => void
 }
 
 
-const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUpdateSignal, onRemoveSignal }: SignalsProps) => {
+    const highlightedRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (highlightKey && highlightedRef.current) {
+            highlightedRef.current.scrollIntoView({ block: "center", behavior: "smooth" })
+        }
+    }, [highlightKey, highlightNonce, signals.length])
+
     if (signals.length === 0) {
         return <div className="w-full rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No signals yet. Select bits and click Add Signal.</div>
     }
@@ -34,15 +45,28 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                     0
                 )
                 const value = evaluateTransform(rawValue, signal.transform, signal.scale, signal.offset)
+                const highlighted = highlightKey === signal.id
+                const signalColor = signal.color ?? frameColor
 
                 return (
-                    <div key={`${signal.name}-${index}`} className="w-full rounded-lg border border-border bg-card/50 p-3 space-y-2">
+                    <div
+                        key={signal.id}
+                        ref={highlighted ? highlightedRef : undefined}
+                        className={cn(
+                            "w-full rounded-lg border border-border bg-card/50 p-3 space-y-2",
+                            highlighted && "ring-1 ring-primary bg-primary/5"
+                        )}
+                    >
                         <div className="flex items-center gap-2">
-                            <span
-                                className="h-2.5 w-2.5 rounded-full border border-border"
-                                style={{ backgroundColor: frameColor }}
-                                aria-hidden
-                            />
+                            <label className="inline-flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center" title="Signal color">
+                                <input
+                                    type="color"
+                                    value={signalColor}
+                                    onChange={(e) => onUpdateSignal(index, { ...signal, color: e.target.value })}
+                                    className="h-4 w-4 cursor-pointer rounded border border-border bg-transparent p-0"
+                                    aria-label={`Color for ${signal.name}`}
+                                />
+                            </label>
                             <input
                                 type="text"
                                 value={signal.name}
@@ -50,7 +74,7 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                                 className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
                                 placeholder={`Signal_${index + 1}`}
                             />
-                            <span className="font-semibold text-sm min-w-16 text-right" style={{ color: frameColor }}>{value.toFixed(2)}</span>
+                            <span className="font-semibold text-sm min-w-16 text-right" style={{ color: signalColor }}>{value.toFixed(2)}</span>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -58,7 +82,7 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 onClick={() => onRemoveSignal(index)}
                             >
-                                <X size={14} />
+                                <Trash2 size={14} />
                             </Button>
                         </div>
 
@@ -131,7 +155,7 @@ const Signals = ({ frameColor, data, signals, onUpdateSignal, onRemoveSignal }: 
                                 className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
                                 placeholder="e.g. (raw * 0.1) - 40"
                             />
-                            <span className="text-[11px] text-muted-foreground/90">Start bit indexing is right-to-left in the byte expander. Decoded raw uses selected endianness first. If transform is empty/invalid, value = raw * scale + offset.</span>
+                            <span className="text-[11px] text-muted-foreground/90">Start bit indexing is right-to-left in the byte expander. Big endian: start bit is the signal's MSB (leftmost). Little endian: start bit is the LSB. If transform is empty/invalid, value = raw * scale + offset.</span>
                         </label>
                     </div>
                 )

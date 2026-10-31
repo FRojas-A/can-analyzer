@@ -42,6 +42,10 @@ export const useFrameUiState = (
     )
   }, [])
 
+  const selectFrame = useCallback((id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }, [])
+
   const selectedIdsSet = useMemo(() => new Set(selectedIds), [selectedIds])
 
   const selectionMode: SelectionActionMode = useMemo(() => {
@@ -96,13 +100,13 @@ export const useFrameUiState = (
     return count
   }, [hiddenIds, messages, messagesVersion, showHidden])
 
-  const selectedSignalCount = useMemo(() => {
+  const signalCount = useMemo(() => {
     let total = 0
-    for (const id of selectedIds) {
-      total += signalsByFrameId[id]?.length ?? 0
+    for (const signals of Object.values(signalsByFrameId)) {
+      total += signals.length
     }
     return total
-  }, [selectedIds, signalsByFrameId])
+  }, [signalsByFrameId])
 
   const selectedFrames = useMemo(() => {
     void messagesVersion
@@ -121,9 +125,10 @@ export const useFrameUiState = (
     showHidden,
     selectedFrames,
     visibleCount,
-    selectedSignalCount,
+    signalCount,
     toggleShowHidden,
     toggleSelect,
+    selectFrame,
     toggleSelectedVisibility,
     toggleHideFrame: toggleHideFrameSelection,
   }
