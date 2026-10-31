@@ -187,6 +187,57 @@ export function generateStableColor(seed: string | number, offset: number = 0): 
   return hslToHex(hue, 72, 58);
 }
 
+const hexToHsl = (hex: string): { h: number; s: number; l: number } | null => {
+  const normalized = hex.replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(normalized.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l: l * 100 };
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) {
+    h = (g - b) / d + (g < b ? 6 : 0);
+  } else if (max === g) {
+    h = (b - r) / d + 2;
+  } else {
+    h = (r - g) / d + 4;
+  }
+  h *= 60;
+
+  return { h, s: s * 100, l: l * 100 };
+};
+
+export const generateSignalColor = (frameColor: string, signalIndex: number): string => {
+  const hsl = hexToHsl(frameColor);
+  if (!hsl) {
+    return frameColor;
+  }
+  if (signalIndex <= 0) {
+    return frameColor;
+  }
+
+  const baseStep = Math.ceil(signalIndex / 2) * 12;
+  const step = signalIndex % 2 === 1 ? -baseStep : baseStep;
+  let lightness = Math.max(18, Math.min(85, hsl.l + step));
+  if (Math.abs(lightness - hsl.l) < 6) {
+    lightness = Math.max(18, Math.min(85, hsl.l - step));
+  }
+  return hslToHex(hsl.h, hsl.s, lightness);
+};
+
 export function formatTimestamp(ts: number): string {
   const d = new Date(ts);
   return d.toLocaleTimeString('en-US', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');

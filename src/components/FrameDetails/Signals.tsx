@@ -21,7 +21,7 @@ const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUp
 
     useEffect(() => {
         if (highlightKey && highlightedRef.current) {
-            highlightedRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" })
+            highlightedRef.current.scrollIntoView({ block: "center", behavior: "smooth" })
         }
     }, [highlightKey, highlightNonce, signals.length])
 
@@ -46,6 +46,7 @@ const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUp
                 )
                 const value = evaluateTransform(rawValue, signal.transform, signal.scale, signal.offset)
                 const highlighted = highlightKey === signal.id
+                const signalColor = signal.color ?? frameColor
 
                 return (
                     <div
@@ -57,11 +58,15 @@ const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUp
                         )}
                     >
                         <div className="flex items-center gap-2">
-                            <span
-                                className="h-2.5 w-2.5 rounded-full border border-border"
-                                style={{ backgroundColor: frameColor }}
-                                aria-hidden
-                            />
+                            <label className="inline-flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center" title="Signal color">
+                                <input
+                                    type="color"
+                                    value={signalColor}
+                                    onChange={(e) => onUpdateSignal(index, { ...signal, color: e.target.value })}
+                                    className="h-4 w-4 cursor-pointer rounded border border-border bg-transparent p-0"
+                                    aria-label={`Color for ${signal.name}`}
+                                />
+                            </label>
                             <input
                                 type="text"
                                 value={signal.name}
@@ -69,7 +74,7 @@ const Signals = ({ frameColor, data, signals, highlightKey, highlightNonce, onUp
                                 className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
                                 placeholder={`Signal_${index + 1}`}
                             />
-                            <span className="font-semibold text-sm min-w-16 text-right" style={{ color: frameColor }}>{value.toFixed(2)}</span>
+                            <span className="font-semibold text-sm min-w-16 text-right" style={{ color: signalColor }}>{value.toFixed(2)}</span>
                             <Button
                                 type="button"
                                 variant="ghost"

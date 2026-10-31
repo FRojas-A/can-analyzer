@@ -1,5 +1,5 @@
 import type { CANMessage, SignalConfig } from "@/types/types"
-import { getSignalBitPositions } from "@/lib/can-utils"
+import { generateSignalColor, getSignalBitPositions } from "@/lib/can-utils"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronRight, Circle, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -101,6 +101,7 @@ const FrameDetails = ({ frame, frameColor, signals, onUpdateSignals, onFrameColo
             scale: 1,
             offset: 0,
             transform: "",
+            color: generateSignalColor(frameColor, signals.length),
         }
 
         updateSignalsForCurrentFrame((current) => [...current, newSignal])
